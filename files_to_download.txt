@@ -1,0 +1,10 @@
+# files_to_download.txt
+#
+# List remote paths to download, one per line.
+# Both files and directories are supported.
+# Lines starting with # are ignored.
+#
+# Examples:
+# /remote/path/to/file.mkv
+# /remote/path/to/My Folder With Spaces/
+# /remote/path/to/another file (2026).mp4
