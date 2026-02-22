@@ -81,9 +81,12 @@ class SFTPDownloader:
         total = self.succeeded + self.failed + self.skipped
         print(f"\n{'─' * 50}")
         print(f"📊  Summary: {total} items processed")
-        print(f"    ✅  {self.succeeded} downloaded")
-        print(f"    ⏭️   {self.skipped} skipped (already complete)")
-        print(f"    ❌  {self.failed} failed")
+        if self.succeeded:
+            print(f"    ✅  {self.succeeded} downloaded")
+        if self.skipped:
+            print(f"    ⏭️   {self.skipped} skipped (already complete)")
+        if self.failed:
+            print(f"    ❌  {self.failed} failed")
 
     # ── directory handling ────────────────────────────────────────────
 
