@@ -64,8 +64,12 @@ class SFTPDownloader:
 
     def download_all(self) -> None:
         """Download every path in the file list."""
-        total = len(self.config.remote_paths)
-        for idx, remote_path in enumerate(self.config.remote_paths, 1):
+        self.download_paths(self.config.remote_paths)
+
+    def download_paths(self, paths: list[str]) -> None:
+        """Download arbitrary given paths."""
+        total = len(paths)
+        for idx, remote_path in enumerate(paths, 1):
             print(f"── [{idx}/{total}] {remote_path}")
             try:
                 if self._is_dir(remote_path):

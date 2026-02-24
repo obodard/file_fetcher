@@ -2,22 +2,18 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 
-from file_fetcher.config import load_config
+from file_fetcher.config import load_config, load_search_config
 from file_fetcher.scheduler import wait_until
 from file_fetcher.sftp_client import SFTPDownloader
+from file_fetcher.scanner import SFTPScanner
+from file_fetcher.report import display_report_and_download
 
 
-def main() -> None:
-    """Run the File Fetcher CLI."""
-
-    print()
-    print("╔══════════════════════════════════════╗")
-    print("║        📁  File Fetcher v0.1         ║")
-    print("╚══════════════════════════════════════╝")
-    print()
-
+def handle_download() -> None:
+    """Run the batch download flow."""
     # 1. Load configuration
     config = load_config()
 
@@ -43,6 +39,70 @@ def main() -> None:
     except Exception as exc:
         print(f"\n💥  Fatal error: {exc}", file=sys.stderr)
         sys.exit(1)
+
+
+def handle_search(query: str) -> None:
+    """Run the intelligent media search flow."""
+    config = load_config()
+    search_config = load_search_config()
+    
+    print(f"\n🧠  Parsing query with {search_config.llm_provider}...")
+    if search_config.llm_provider == "ollama":
+        from file_fetcher.llm.ollama_provider import OllamaProvider
+        provider = OllamaProvider(search_config.ollama_host, search_config.ollama_model)
+    elif search_config.llm_provider == "gemini":
+        from file_fetcher.llm.gemini_provider import GeminiProvider
+        provider = GeminiProvider(search_config.gemini_api_key)
+    else:
+        print(f"❌  Unknown LLM provider: {search_config.llm_provider}")
+        sys.exit(1)
+        
+    filters = provider.parse_query(query)
+    
+    try:
+        with SFTPDownloader(config) as downloader:
+            print("\n📡  Scanning server for matching media...")
+            scanner = SFTPScanner(downloader)
+            entries = scanner.scan(filters)
+            
+            display_report_and_download(entries, search_config, downloader)
+    except KeyboardInterrupt:
+        print("\n\n⛔  Interrupted by user.")
+        sys.exit(130)
+    except Exception as exc:
+        print(f"\n💥  Fatal error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+def main() -> None:
+    """Run the File Fetcher CLI."""
+    print()
+    print("╔══════════════════════════════════════╗")
+    print("║        📁  File Fetcher v0.2         ║")
+    print("╚══════════════════════════════════════╝")
+    print()
+
+    parser = argparse.ArgumentParser(description="File Fetcher")
+    subparsers = parser.add_subparsers(dest="command")
+    
+    # Download subcommand
+    subparsers.add_parser("download", help="Batch download paths defined in files_to_download.txt")
+    
+    # Search subcommand
+    search_parser = subparsers.add_parser("search", help="Intelligent media search")
+    search_parser.add_argument("query", help="Natural language query (e.g. 'recent 2026 movies')")
+    
+    # If no arguments provided, default to download for backward compatibility
+    if len(sys.argv) == 1:
+        handle_download()
+        return
+        
+    args = parser.parse_args()
+    
+    if args.command == "download":
+        handle_download()
+    elif args.command == "search":
+        handle_search(args.query)
 
 
 if __name__ == "__main__":

@@ -103,18 +103,53 @@ Omit the `schedule` section (or leave it commented out) to start downloading imm
 
 ---
 
+## Phase 2 — Media Discovery Server Search
+
+File Fetcher supports finding media on your server using natural language (powered by **Ollama** or **Gemini**) and augmenting it with ratings from **OMDb (Rotten Tomatoes & IMDb)** before downloading.
+
+### 1. Set up an LLM (Ollama recommended)
+
+File Fetcher uses local LLMs via Ollama to parse your search queries privately.
+
+1. **Install Ollama**
+   - macOS: `brew install ollama`
+   - Linux: `curl -fsSL https://ollama.com/install.sh | sh`
+2. **Download a model**
+   Run the following to pull the recommended model (Llama 3):
+   ```bash
+   ollama pull llama3
+   ```
+3. **Start the server** (if not running automatically)
+   ```bash
+   ollama serve
+   ```
+
+*(Alternatively, you can use Google Gemini by setting `LLM_PROVIDER=gemini` and providing a `GEMINI_API_KEY` in your `.env`)*
+
+### 2. Set up OMDb API Key
+
+To display IMDb and Rotten Tomatoes ratings in the console, File Fetcher uses the OMDb API.
+1. Get a **free API key** (1,000 requests/day limit) from [omdbapi.com](http://www.omdbapi.com/apikey.aspx).
+2. Add it to your `.env` file:
+   ```env
+   OMDB_API_KEY=your_issued_key_here
+   ```
+
+---
+
 ## Usage
 
 ### Immediate download
 
 ```bash
-python -m file_fetcher
+python -m file_fetcher download
 ```
+*(Or simply `python -m file_fetcher` — it defaults to `download` backward compatibility).*
 
 Or, if installed via `pip install -e .`:
 
 ```bash
-file-fetcher
+file-fetcher download
 ```
 
 ### Scheduled download
@@ -135,6 +170,37 @@ python -m file_fetcher
 📂  Destination: /Users/you/downloads
 
 ⏳  Download scheduled for 2026-03-01 02:00. Waiting 6h 30m 15s …
+```
+
+### Intelligent Media Search
+
+Both TV shows and Movies are fully supported. Find items on the server by describing them:
+
+```bash
+file-fetcher search "find me the latest sci-fi movies from 2025 or 2026"
+```
+
+The app will:
+1. Parse your intent with Ollama.
+2. Scan the remote server over SFTP.
+3. Lookup IMDb and Rotten Tomatoes ratings.
+4. Prompt you to download!
+
+```
+🧠  Parsing query with ollama...
+
+📡  Scanning server for matching media...
+
+─────────────────────────────────────────────────────────────────────────────────────
+ #   | Title                                    | Year  | RT    | IMDb  | Uploaded  
+─────────────────────────────────────────────────────────────────────────────────────
+ 1   | The Secret Agent                         | 2025  | 88%   | 7.6   | 2026-02-15
+ 2   | Beyond the Horizon                       | 2026  | 92%   | 8.1   | 2026-02-10
+─────────────────────────────────────────────────────────────────────────────────────
+2 items found.
+
+📥  Enter numbers to download (e.g. 1,3), 'all', or 'q' to quit: 1
+🚀  Downloading 1 item(s)...
 ```
 
 ### Resuming interrupted downloads

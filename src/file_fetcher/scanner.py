@@ -1,0 +1,84 @@
+"""Scan SFTP server for media files based on parsed LLM filters."""
+from dataclasses import dataclass
+from datetime import datetime
+import stat
+from typing import TYPE_CHECKING
+import paramiko
+
+from file_fetcher.title_parser import parse_title_and_year
+
+if TYPE_CHECKING:
+    from file_fetcher.llm.base import SearchFilters
+    from file_fetcher.sftp_client import SFTPDownloader
+
+@dataclass
+class MediaEntry:
+    title: str
+    year: int | None
+    remote_path: str
+    modified_date: datetime
+    size_bytes: int
+    media_type: str
+
+class SFTPScanner:
+    """Scans the designated media folders over SFTP."""
+    
+    def __init__(self, downloader: "SFTPDownloader"):
+        self.sftp = downloader.sftp
+        
+    def scan(self, filters: "SearchFilters") -> list[MediaEntry]:
+        """Find media matching the filters."""
+        # Define base dirs based on media type
+        base_dirs = []
+        if filters.media_type in ("movies", "all"):
+            base_dirs.extend(["Media1/Films", "Media2/Films", "Media1/4k", "Media2/4k"])
+        if filters.media_type in ("tv", "all"):
+            base_dirs.extend(["Media1/Séries TV", "Media2/Séries TV"])
+            
+        results = []
+        now = datetime.now()
+        
+        for base_dir in base_dirs:
+            try:
+                entries = self.sftp.listdir_attr(base_dir)
+            except FileNotFoundError:
+                continue
+                
+            for entry in entries:
+                filename = entry.filename
+                
+                # Exclude .nfo files or tiny info files if needed (usually we care about the directory name)
+                # But here we assume each entry at the root of a media folder is a movie/show.
+                mtime = entry.st_mtime
+                mod_date = datetime.fromtimestamp(mtime)
+                
+                # Filter by max age
+                if filters.max_age_days is not None:
+                    age_days = (now - mod_date).days
+                    if age_days > filters.max_age_days:
+                        continue
+                        
+                title, year = parse_title_and_year(filename)
+                
+                # Filter by year
+                if filters.year is not None and year != filters.year:
+                    continue
+                    
+                # Filter by keywords
+                if filters.keywords:
+                    lower_filename = filename.lower()
+                    if not all(kw.lower() in lower_filename for kw in filters.keywords):
+                        continue
+                
+                entry_media_type = "tv" if "Séries TV" in base_dir else "movie"
+                
+                results.append(MediaEntry(
+                    title=title,
+                    year=year,
+                    remote_path=f"{base_dir}/{filename}",
+                    modified_date=mod_date,
+                    size_bytes=entry.st_size,
+                    media_type=entry_media_type
+                ))
+                
+        return results
