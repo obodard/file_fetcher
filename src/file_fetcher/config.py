@@ -35,6 +35,15 @@ class AppConfig:
     max_retries: int = 3
     retry_delay: float = 5.0  # seconds
 
+@dataclass
+class SearchConfig:
+    """Holds configuration for Phase 2 search/LLM features."""
+    llm_provider: str
+    ollama_model: str
+    ollama_host: str
+    gemini_api_key: str
+    omdb_api_key: str
+
 
 def load_config(
     env_path: str | Path = ".env",
@@ -68,6 +77,29 @@ def load_config(
         download_dir=download_dir,
         remote_paths=remote_paths,
         scheduled_at=scheduled_at,
+    )
+
+
+def load_search_config(env_path: str | Path = ".env") -> SearchConfig:
+    """Build a ``SearchConfig`` from .env."""
+    load_dotenv(env_path)
+
+    llm_provider = os.getenv("LLM_PROVIDER", "ollama")
+    ollama_model = os.getenv("OLLAMA_MODEL", "llama3")
+    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    gemini_api_key = os.getenv("GEMINI_API_KEY", "")
+    omdb_api_key = _require_env("OMDB_API_KEY")
+
+    if llm_provider == "gemini" and not gemini_api_key:
+        print("❌  Missing GEMINI_API_KEY for LLM_PROVIDER=gemini", file=sys.stderr)
+        sys.exit(1)
+
+    return SearchConfig(
+        llm_provider=llm_provider,
+        ollama_model=ollama_model,
+        ollama_host=ollama_host,
+        gemini_api_key=gemini_api_key,
+        omdb_api_key=omdb_api_key,
     )
 
 
