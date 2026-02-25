@@ -3,6 +3,7 @@ import sys
 from google import genai
 from google.genai import types
 
+from file_fetcher import logger
 from file_fetcher.llm.base import LLMProvider, SearchFilters
 
 class GeminiProvider(LLMProvider):
@@ -20,6 +21,9 @@ class GeminiProvider(LLMProvider):
         User query: "{user_query}"
         """
         try:
+            logger.info("Sending query to Gemini API")
+            logger.debug(f"Gemini prompt payload: {prompt}")
+            
             response = self.client.models.generate_content(
                 model='gemini-2.5-flash',
                 contents=prompt,
@@ -29,7 +33,10 @@ class GeminiProvider(LLMProvider):
                     temperature=0.0,
                 ),
             )
+            
+            logger.debug(f"Gemini response payload: {response.text}")
             return SearchFilters.model_validate_json(response.text)
         except Exception as e:
+            logger.error(f"Failed to parse query with Gemini: {e}")
             print(f"❌ Failed to parse query with Gemini: {e}", file=sys.stderr)
             sys.exit(1)

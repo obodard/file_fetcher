@@ -2,6 +2,7 @@
 import sys
 import ollama
 
+from file_fetcher import logger
 from file_fetcher.llm.base import LLMProvider, SearchFilters
 
 class OllamaProvider(LLMProvider):
@@ -26,6 +27,9 @@ class OllamaProvider(LLMProvider):
         User query: "{user_query}"
         """
         try:
+            logger.info(f"Sending query to Ollama (model: {self.model_name})")
+            logger.debug(f"Ollama prompt payload: {prompt}")
+            
             response = self.client.chat(
                 model=self.model_name,
                 messages=[{"role": "user", "content": prompt}],
@@ -34,13 +38,16 @@ class OllamaProvider(LLMProvider):
             )
             
             content = response.message.content
+            logger.debug(f"Ollama response payload: {content}")
 
             # ollama might return empty string if the model fails to adhere
             if not content:
+                logger.warning("Empty response received from Ollama.")
                 print("⚠️  Warning: empty response from Ollama. Using defaults.", file=sys.stderr)
                 return SearchFilters()
                 
             return SearchFilters.model_validate_json(content)
         except Exception as e:
+            logger.error(f"Failed to parse query with Ollama: {e}")
             print(f"❌ Failed to parse query with Ollama: {e}", file=sys.stderr)
             sys.exit(1)

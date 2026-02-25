@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from file_fetcher.config import load_config, load_search_config
+from file_fetcher.config import load_config, load_search_config, setup_logging
 from file_fetcher.scheduler import wait_until
 from file_fetcher.sftp_client import SFTPDownloader
 from file_fetcher.scanner import SFTPScanner
@@ -16,6 +16,14 @@ def handle_download() -> None:
     """Run the batch download flow."""
     # 1. Load configuration
     config = load_config()
+    
+    # Also attempt to load search config to mask those keys if they exist in env
+    try:
+        search_config = load_search_config()
+    except Exception:
+        search_config = None
+        
+    setup_logging(config, search_config)
 
     if not config.remote_paths:
         print("Nothing to download — file list is empty.")
@@ -45,6 +53,7 @@ def handle_search(query: str) -> None:
     """Run the intelligent media search flow."""
     config = load_config()
     search_config = load_search_config()
+    setup_logging(config, search_config)
     
     print(f"\n🧠  Parsing query with {search_config.llm_provider}...")
     if search_config.llm_provider == "ollama":

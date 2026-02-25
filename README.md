@@ -139,16 +139,28 @@ To display IMDb and Rotten Tomatoes ratings in the console, File Fetcher uses th
 
 ## Usage
 
-### Immediate download
+### Using the convenience script (Recommended)
+
+The easiest way to run the program is to use the provided `run.sh` script. It automatically ensures the Python virtual environment is created, dependencies are installed, and launches the app directly.
 
 ```bash
-python -m file_fetcher download
+# Make the script executable (only needed once)
+chmod +x run.sh
+
+# Immediate download
+./run.sh download
 ```
-*(Or simply `python -m file_fetcher` — it defaults to `download` backward compatibility).*
 
-Or, if installed via `pip install -e .`:
+### Manual launch
+
+If you prefer to manage the environment manually:
 
 ```bash
+# Activate your virtual environment first
+source .venv/bin/activate
+
+python -m file_fetcher download
+# Or, if installed via pip install -e .:
 file-fetcher download
 ```
 
@@ -158,7 +170,7 @@ file-fetcher download
 2. Launch the app — it will display a countdown and start automatically at the scheduled time.
 
 ```bash
-python -m file_fetcher
+./run.sh
 ```
 
 ```
@@ -177,7 +189,7 @@ python -m file_fetcher
 Both TV shows and Movies are fully supported. Find items on the server by describing them:
 
 ```bash
-file-fetcher search "find me the latest sci-fi movies from 2025 or 2026"
+./run.sh search "find me the latest sci-fi movies from 2025 or 2026"
 ```
 
 The app will:

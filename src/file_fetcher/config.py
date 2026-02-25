@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import sys
+import logging
+import logging.handlers
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -165,3 +167,77 @@ def _parse_file_list(path: Path) -> list[str]:
         print(f"⚠️  File list is empty: {path}", file=sys.stderr)
 
     return paths
+
+
+class MaskingFilter(logging.Filter):
+    """Filter to mask sensitive information in log records."""
+    
+    def __init__(self, secrets: list[str]) -> None:
+        super().__init__()
+        # Filter out empty strings to avoid destroying all logs
+        self.secrets = [s for s in secrets if s]
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            for secret in self.secrets:
+                record.msg = record.msg.replace(secret, "***MASKED***")
+        
+        # If the log involves arguments
+        if isinstance(record.args, tuple):
+            new_args = []
+            for arg in record.args:
+                if isinstance(arg, str):
+                    for secret in self.secrets:
+                        arg = arg.replace(secret, "***MASKED***")
+                new_args.append(arg)
+            record.args = tuple(new_args)
+            
+        elif isinstance(record.args, dict):
+            new_args = {}
+            for k, v in record.args.items():
+                if isinstance(v, str):
+                    for secret in self.secrets:
+                        v = v.replace(secret, "***MASKED***")
+                new_args[k] = v
+            record.args = new_args
+            
+        return True
+
+
+def setup_logging(app_config: AppConfig, search_config: Optional[SearchConfig] = None) -> None:
+    """Configure the root logger with a rotating file handler and masking filter."""
+    logger = logging.getLogger("file_fetcher")
+    logger.setLevel(logging.DEBUG)
+
+    # Avoid adding multiple handlers if setup is called multiple times
+    if logger.handlers:
+        return
+
+    # Rotating file handler (10 MB max, up to 3 backups)
+    log_file = Path("file_fetcher.log")
+    handler = logging.handlers.RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=3, encoding="utf-8"
+    )
+    
+    # Formatter
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    handler.setFormatter(formatter)
+    
+    # Secrets to mask
+    secrets = [
+        app_config.sftp_user,
+        app_config.sftp_password,
+    ]
+    if search_config:
+        secrets.extend([
+            search_config.gemini_api_key,
+            search_config.omdb_api_key
+        ])
+
+    masking_filter = MaskingFilter(secrets=secrets)
+    handler.addFilter(masking_filter)
+    
+    logger.addHandler(handler)
+    logger.info("Logging initialized.")

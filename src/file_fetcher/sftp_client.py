@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import paramiko
 
+from file_fetcher import logger
 from file_fetcher.progress import TransferProgress
 
 if TYPE_CHECKING:
@@ -37,6 +38,7 @@ class SFTPDownloader:
     def connect(self) -> None:
         """Open an SFTP connection using password authentication."""
         print(f"🔗  Connecting to {self.config.sftp_host}:{self.config.sftp_port} …")
+        logger.info(f"Connecting to SFTP server: {self.config.sftp_host}:{self.config.sftp_port} with user: {self.config.sftp_user}")
         self._transport = paramiko.Transport(
             (self.config.sftp_host, self.config.sftp_port)
         )
@@ -45,6 +47,7 @@ class SFTPDownloader:
             password=self.config.sftp_password,
         )
         self._sftp = paramiko.SFTPClient.from_transport(self._transport)
+        logger.info("SFTP connection established successfully")
         print("✅  Connected.\n")
 
     def disconnect(self) -> None:
@@ -53,6 +56,7 @@ class SFTPDownloader:
             self._sftp.close()
         if self._transport:
             self._transport.close()
+        logger.info("SFTP connection closed")
         print("\n🔌  Disconnected.")
 
     @property
@@ -76,8 +80,10 @@ class SFTPDownloader:
                     self._download_dir(remote_path)
                 else:
                     local_path = self._local_path_for(remote_path)
+                    logger.debug(f"Initiating download for {remote_path} to {local_path}")
                     self._download_file_with_retry(remote_path, local_path)
             except Exception as exc:
+                logger.error(f"Failed to process path {remote_path}: {exc}")
                 print(f"   ❌  Failed: {exc}")
                 self.failed += 1
 
@@ -139,6 +145,7 @@ class SFTPDownloader:
                     time.sleep(wait)
 
         # All retries exhausted
+        logger.error(f"Failed to download {remote_path} after {self.config.max_retries} attempts: {last_exc}")
         print(
             f"   ❌  Failed after {self.config.max_retries} attempts: "
             f"{last_exc}"
@@ -157,6 +164,7 @@ class SFTPDownloader:
         local_size = local_path.stat().st_size if local_path.exists() else 0
 
         if local_size == remote_size:
+            logger.debug(f"Skipping {remote_path} as it is already complete")
             print(f"   ⏭️   Already complete: {local_path.name}")
             self.skipped += 1
             return
@@ -166,8 +174,10 @@ class SFTPDownloader:
             self._resume_download(remote_path, local_path, local_size, remote_size)
         else:
             # Full download (also handles local_size > remote_size by overwriting)
+            logger.debug(f"Starting full download for {remote_path}")
             self._full_download(remote_path, local_path, remote_size)
 
+        logger.info(f"Successfully finished processing {remote_path}")
         self.succeeded += 1
 
     def _full_download(
