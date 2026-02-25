@@ -9,6 +9,17 @@ from file_fetcher import logger
 class Ratings:
     imdb: str
     rotten_tomatoes: str
+    genre: str = "N/A"
+    rated: str = "N/A"
+    runtime: str = "N/A"
+    plot: str = "N/A"
+    year: str = "N/A"
+    director: str = "N/A"
+    metacritic: str = "N/A"
+    type: str = "N/A"
+    language: str = "N/A"
+    actors: str = "N/A"
+    awards: str = "N/A"
 
 def get_ratings(title: str, year: int | None, api_key: str) -> Ratings:
     """Fetch ratings from OMDb API."""
@@ -37,13 +48,43 @@ def get_ratings(title: str, year: int | None, api_key: str) -> Ratings:
             return Ratings("N/A", "N/A")
             
         imdb = data.get("imdbRating", "N/A")
+        genre = data.get("Genre", "N/A")
+        rated = data.get("Rated", "N/A")
+        runtime = data.get("Runtime", "N/A")
+        plot = data.get("Plot", "N/A")
+        res_year = data.get("Year", "N/A")
+        director = data.get("Director", "N/A")
+        metacritic = data.get("Metascore", "N/A")
+        type_str = data.get("Type", "N/A").capitalize()
+        language = data.get("Language", "N/A")
+        actors = data.get("Actors", "N/A")
+        awards = data.get("Awards", "N/A")
+        
+        # truncate language if it's too long (e.g. "English, Spanish")
+        if language != "N/A" and "," in language:
+            language = language.split(",")[0]
+        
         rt = "N/A"
         for rating in data.get("Ratings", []):
             if rating.get("Source") == "Rotten Tomatoes":
                 rt = rating.get("Value", "N/A")
                 break
                 
-        return Ratings(imdb=imdb, rotten_tomatoes=rt)
+        return Ratings(
+            imdb=imdb, 
+            rotten_tomatoes=rt,
+            genre=genre,
+            rated=rated,
+            runtime=runtime,
+            plot=plot,
+            year=res_year,
+            director=director,
+            metacritic=metacritic,
+            type=type_str,
+            language=language,
+            actors=actors,
+            awards=awards
+        )
     except Exception as exc:
         logger.error(f"Error fetching OMDb ratings for '{title}': {exc}")
         return Ratings("N/A", "N/A")

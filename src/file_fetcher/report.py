@@ -26,23 +26,50 @@ def display_report_and_download(
         print("\n🔍  No media found matching the criteria.")
         return
         
-    print(f"\n{'─' * 85}")
-    print(f" {'#':<3} | {'Title':<38} | {'Year':<5} | {'RT':<5} | {'IMDb':<5} | {'Uploaded':<10}")
-    print(f"{'─' * 85}")
+    # Pre-fetch all ratings so we can use them in both the summary and detail views
+    entry_ratings = []
     
     for idx, entry in enumerate(entries, 1):
         ratings = get_ratings(entry.title, entry.year, search_config.omdb_api_key)
+        entry_ratings.append(ratings)
+
+    # Detailed section (First pass)
+    print("\n🎬  Details:")
+    for idx, (entry, ratings) in enumerate(zip(entries, entry_ratings), 1):
+        actual_year = ratings.year if ratings.year != "N/A" else (str(entry.year) if entry.year else "N/A")
+        print(f" {idx}. {entry.title} ({actual_year}) • {ratings.rated} • {ratings.runtime}")
+        print(f"    Genre:    {ratings.genre}")
+        print(f"    Director: {ratings.director}")
+        print(f"    Actors:   {ratings.actors}")
+        print(f"    Awards:   {ratings.awards}")
         
+        # Format plot to not be too long
+        plot_disp = ratings.plot
+        if len(plot_disp) > 100:
+            plot_disp = plot_disp[:97] + "..."
+        print(f"    Plot:     {plot_disp}")
+        
+        print(f"    Ratings:  IMDb ({ratings.imdb}) | RT ({ratings.rotten_tomatoes}) | Metacritic ({ratings.metacritic})")
+        print()
+        
+    # Table section
+    print(f"{'─' * 110}")
+    print(f" {'#':<3} | {'Title':<33} | {'Year':<5} | {'Type':<7} | {'Language':<10} | {'RT':<4} | {'IMDb':<4} | {'MC':<3} | {'Uploaded':<10}")
+    print(f"{'─' * 110}")
+    
+    for idx, (entry, ratings) in enumerate(zip(entries, entry_ratings), 1):
         year_str = str(entry.year) if entry.year else "N/A"
         date_str = entry.modified_date.strftime("%Y-%m-%d")
         
         title_disp = entry.title
-        if len(title_disp) > 36:
-            title_disp = title_disp[:33] + "..."
+        if len(title_disp) > 31:
+            title_disp = title_disp[:28] + "..."
             
-        print(f" {idx:<3} | {title_disp:<38} | {year_str:<5} | {ratings.rotten_tomatoes:<5} | {ratings.imdb:<5} | {date_str:<10}")
+        rt_disp = ratings.rotten_tomatoes.replace("%", "") if ratings.rotten_tomatoes != "N/A" else "N/A"
+        
+        print(f" {idx:<3} | {title_disp:<33} | {year_str:<5} | {ratings.type:<7} | {ratings.language:<10} | {rt_disp:<4} | {ratings.imdb:<4} | {ratings.metacritic:<3} | {date_str:<10}")
 
-    print(f"{'─' * 85}")
+    print(f"{'─' * 110}")
     print(f"{len(entries)} items found.\n")
     
     while True:
