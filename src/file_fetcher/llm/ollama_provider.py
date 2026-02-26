@@ -3,7 +3,7 @@ import sys
 import ollama
 
 from file_fetcher import logger
-from file_fetcher.llm.base import LLMProvider, SearchFilters
+from file_fetcher.llm.base import LLMProvider, SearchFilters, sanitize_query
 
 class OllamaProvider(LLMProvider):
     def __init__(self, host: str, model_name: str):
@@ -15,6 +15,7 @@ class OllamaProvider(LLMProvider):
         from datetime import datetime
         current_date = datetime.now().strftime("%Y-%m-%d")
         schema = SearchFilters.model_json_schema()
+        safe_query = sanitize_query(user_query)
         
         prompt = f"""
         Extract the following search parameters from the user's query about media:
@@ -30,7 +31,7 @@ class OllamaProvider(LLMProvider):
         
         Return ONLY valid JSON matching the schema. Do not include markdown formatting or commentary.
         
-        User query: "{user_query}"
+        User query: "{safe_query}"
         """
         try:
             logger.info(f"Sending query to Ollama (model: {self.model_name})")

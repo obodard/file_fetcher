@@ -4,7 +4,7 @@ from google import genai
 from google.genai import types
 
 from file_fetcher import logger
-from file_fetcher.llm.base import LLMProvider, SearchFilters
+from file_fetcher.llm.base import LLMProvider, SearchFilters, sanitize_query
 
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key: str, model_name: str = 'gemini-2.5-flash'):
@@ -14,6 +14,7 @@ class GeminiProvider(LLMProvider):
     def parse_query(self, user_query: str) -> SearchFilters:
         from datetime import datetime
         current_date = datetime.now().strftime("%Y-%m-%d")
+        safe_query = sanitize_query(user_query)
         prompt = f"""
         Extract the following search parameters from the user's query about media:
         - media_type ('movies', 'tv', 'all'): defaults to 'all' if not specified.
@@ -26,7 +27,7 @@ class GeminiProvider(LLMProvider):
         - keywords: list of EXACT strings that must appear in the filename (e.g. 1080p, x264). Do NOT put thematic or plot keywords here.
         - semantic_query (string): any descriptive, subjective, or thematic criteria that describes the content (e.g., "like Game of Thrones", "about knights", "sci-fi space movie"). Leave null if there is no semantic description.
         
-        User query: "{user_query}"
+        User query: "{safe_query}"
         """
         try:
             logger.info("Sending query to Gemini API")
