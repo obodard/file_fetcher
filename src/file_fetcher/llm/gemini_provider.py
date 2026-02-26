@@ -12,11 +12,15 @@ class GeminiProvider(LLMProvider):
         self.model_name = model_name
         
     def parse_query(self, user_query: str) -> SearchFilters:
+        from datetime import datetime
+        current_date = datetime.now().strftime("%Y-%m-%d")
         prompt = f"""
         Extract the following search parameters from the user's query about media:
         - media_type ('movies', 'tv', 'all'): defaults to 'all' if not specified.
         - year (integer or null): MUST be null UNLESS the user explicitly types a precise 4-digit year (e.g., "1999" or "2025"). Phrases like "this year" or "recent" do NOT count as a year. If no explicit 4-digit year is found, return null.
         - max_age_days (integer): numeric amount of days if they ask for how recently it was uploaded/added. 
+          CURRENT DATE: {current_date}. If they give a specific date (e.g. "since 2026-01-10"), calculate the number of days between that date and CURRENT DATE.
+          If they use relative terms like "last week" (7 days), "last month" (30 days), "past 20 days" (20 days), calculate the appropriate number of days.
           If they say "recent" or "recently", use 30.
           If they say "uploaded this year", use 365.
         - keywords: list of EXACT strings that must appear in the filename (e.g. 1080p, x264). Do NOT put thematic or plot keywords here.
