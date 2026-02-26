@@ -257,10 +257,16 @@ class SFTPDownloader:
         """Map a remote absolute path to a local download path.
 
         Example: /media/Films/Movie.mkv → ./downloads/media/Films/Movie.mkv
+
+        Raises ``ValueError`` if the resolved path escapes the download directory
+        (e.g. a malicious server returning ``../../etc/passwd``).
         """
         # Strip leading slashes to make it relative
         relative = remote_path.lstrip("/")
-        return self.config.download_dir / relative
+        target = (self.config.download_dir / relative).resolve()
+        if not target.is_relative_to(self.config.download_dir.resolve()):
+            raise ValueError(f"Path traversal detected: {remote_path}")
+        return target
 
     # ── context manager ───────────────────────────────────────────────
 

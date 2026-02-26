@@ -51,6 +51,19 @@ class TestLocalPathFor:
         result = dl._local_path_for("/path/My Movie (2026).mkv")
         assert result == tmp_path / "dl" / "path" / "My Movie (2026).mkv"
 
+    def test_rejects_path_traversal(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        dl = SFTPDownloader(config)
+        with pytest.raises(ValueError, match="Path traversal detected"):
+            dl._local_path_for("/media/../../etc/passwd")
+
+    def test_allows_safe_dotdot_within_download_dir(self, tmp_path: Path) -> None:
+        """A path like /a/b/../b/file.mkv that resolves inside download_dir is fine."""
+        config = _make_config(tmp_path)
+        dl = SFTPDownloader(config)
+        result = dl._local_path_for("/a/b/../b/file.mkv")
+        assert result.is_relative_to((tmp_path / "dl").resolve())
+
 
 class TestDownloadFile:
     """Test single-file download logic (mocking SFTP)."""
