@@ -26,7 +26,7 @@ def get_ratings(title: str, year: int | None, api_key: str) -> Ratings:
     if not api_key or api_key == "your_omdb_api_key":
         return Ratings("N/A", "N/A")
         
-    url = "http://www.omdbapi.com/"
+    url = "https://www.omdbapi.com/"
     params = {
         "t": title,
         "apikey": api_key
