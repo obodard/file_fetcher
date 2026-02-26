@@ -2,7 +2,7 @@
 import sys
 from typing import TYPE_CHECKING
 from file_fetcher.scanner import MediaEntry
-from file_fetcher.ratings import get_ratings
+from file_fetcher.ratings import Ratings
 
 if TYPE_CHECKING:
     from file_fetcher.config import SearchConfig
@@ -19,6 +19,7 @@ def format_size(size_bytes: int) -> str:
 
 def display_report_and_download(
     entries: list[MediaEntry], 
+    entry_ratings: list[Ratings],
     search_config: "SearchConfig", 
     downloader: "SFTPDownloader"
 ) -> None:
@@ -26,13 +27,6 @@ def display_report_and_download(
         print("\n🔍  No media found matching the criteria.")
         return
         
-    # Pre-fetch all ratings so we can use them in both the summary and detail views
-    entry_ratings = []
-    
-    for idx, entry in enumerate(entries, 1):
-        ratings = get_ratings(entry.title, entry.year, search_config.omdb_api_key)
-        entry_ratings.append(ratings)
-
     # Detailed section (First pass)
     print("\n🎬  Details:")
     for idx, (entry, ratings) in enumerate(zip(entries, entry_ratings), 1):

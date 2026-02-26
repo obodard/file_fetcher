@@ -10,6 +10,7 @@ from file_fetcher.scheduler import wait_until
 from file_fetcher.sftp_client import SFTPDownloader
 from file_fetcher.scanner import SFTPScanner
 from file_fetcher.report import display_report_and_download
+from file_fetcher.ratings import get_ratings
 
 
 def handle_download() -> None:
@@ -61,7 +62,7 @@ def handle_search(query: str) -> None:
         provider = OllamaProvider(search_config.ollama_host, search_config.ollama_model)
     elif search_config.llm_provider == "gemini":
         from file_fetcher.llm.gemini_provider import GeminiProvider
-        provider = GeminiProvider(search_config.gemini_api_key)
+        provider = GeminiProvider(search_config.gemini_api_key, search_config.gemini_model)
     else:
         print(f"❌  Unknown LLM provider: {search_config.llm_provider}")
         sys.exit(1)
@@ -74,7 +75,31 @@ def handle_search(query: str) -> None:
             scanner = SFTPScanner(downloader)
             entries = scanner.scan(filters)
             
-            display_report_and_download(entries, search_config, downloader)
+            # Pre-fetch OMDb metadata. We need it for both post-filtering (if applicable) and reporting.
+            ratings_list = [
+                get_ratings(e.title, e.year, search_config.omdb_api_key) for e in entries
+            ]
+            
+            if filters.semantic_query and entries:
+                print(f"🕵️  Post-filtering {len(entries)} items based on semantic query...")
+                candidates = []
+                for i, (entry, rating) in enumerate(zip(entries, ratings_list)):
+                    candidates.append({
+                        "index": i,
+                        "title": entry.title,
+                        "plot": rating.plot,
+                        "genre": rating.genre,
+                        "actors": rating.actors,
+                        "director": rating.director
+                    })
+                    
+                matched_indices = provider.filter_candidates(filters.semantic_query, candidates)
+                
+                # Keep only matched entries
+                entries = [entries[i] for i in matched_indices if 0 <= i < len(entries)]
+                ratings_list = [ratings_list[i] for i in matched_indices if 0 <= i < len(ratings_list)]
+            
+            display_report_and_download(entries, ratings_list, search_config, downloader)
     except KeyboardInterrupt:
         print("\n\n⛔  Interrupted by user.")
         sys.exit(130)

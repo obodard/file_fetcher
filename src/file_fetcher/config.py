@@ -44,6 +44,7 @@ class SearchConfig:
     ollama_model: str
     ollama_host: str
     gemini_api_key: str
+    gemini_model: str
     omdb_api_key: str
 
 
@@ -90,6 +91,7 @@ def load_search_config(env_path: str | Path = ".env") -> SearchConfig:
     ollama_model = os.getenv("OLLAMA_MODEL", "llama3")
     ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
     gemini_api_key = os.getenv("GEMINI_API_KEY", "")
+    gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     omdb_api_key = _require_env("OMDB_API_KEY")
 
     if llm_provider == "gemini" and not gemini_api_key:
@@ -101,6 +103,7 @@ def load_search_config(env_path: str | Path = ".env") -> SearchConfig:
         ollama_model=ollama_model,
         ollama_host=ollama_host,
         gemini_api_key=gemini_api_key,
+        gemini_model=gemini_model,
         omdb_api_key=omdb_api_key,
     )
 

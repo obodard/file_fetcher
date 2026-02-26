@@ -41,6 +41,12 @@ def parse_title_and_year(filename: str) -> tuple[str, int | None]:
     match = tags_re.search(title_part)
     if match:
         title_part = title_part[:match.start()]
+        
+    # Strip Season/Episode indicators like S01, S01E03, Season 1, etc.
+    season_re = re.compile(r'\b(S\d{1,2}(E\d{1,2})?|Season\s*\d{1,2})\b', flags=re.IGNORECASE)
+    match = season_re.search(title_part)
+    if match:
+        title_part = title_part[:match.start()]
     
     # Clean up trailing non-alphanumeric chars (braces, hyphens, extra spaces)
     title_part = re.sub(r'[\(\[\-\s]+$', '', title_part).strip()
