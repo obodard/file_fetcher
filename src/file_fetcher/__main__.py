@@ -25,6 +25,8 @@ def handle_download() -> None:
         search_config = None
         
     setup_logging(config, search_config)
+    from file_fetcher import logger
+    logger.info(f"Command executed: {' '.join(sys.argv)}")
 
     if not config.remote_paths:
         print("Nothing to download — file list is empty.")
@@ -55,6 +57,8 @@ def handle_search(query: str) -> None:
     config = load_config()
     search_config = load_search_config()
     setup_logging(config, search_config)
+    from file_fetcher import logger
+    logger.info(f"Command executed: {' '.join(sys.argv)}")
     
     print(f"\n🧠  Parsing query with {search_config.llm_provider}...")
     if search_config.llm_provider == "ollama":
@@ -99,7 +103,7 @@ def handle_search(query: str) -> None:
                 entries = [entries[i] for i in matched_indices if 0 <= i < len(entries)]
                 ratings_list = [ratings_list[i] for i in matched_indices if 0 <= i < len(ratings_list)]
             
-            display_report_and_download(entries, ratings_list, search_config, downloader)
+            display_report_and_download(entries, ratings_list, config, downloader)
     except KeyboardInterrupt:
         print("\n\n⛔  Interrupted by user.")
         sys.exit(130)

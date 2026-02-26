@@ -5,6 +5,7 @@ import stat
 from typing import TYPE_CHECKING
 import paramiko
 
+from file_fetcher import logger
 from file_fetcher.title_parser import parse_title_and_year
 
 if TYPE_CHECKING:
@@ -40,6 +41,7 @@ class SFTPScanner:
         
         for base_dir in base_dirs:
             try:
+                logger.debug(f"SFTP listdir_attr: {base_dir}")
                 entries = self.sftp.listdir_attr(base_dir)
             except FileNotFoundError:
                 continue
@@ -81,4 +83,5 @@ class SFTPScanner:
                     media_type=entry_media_type
                 ))
                 
+        logger.info(f"Discovered {len(results)} raw media entries matching file-system filters: {[r.title for r in results]}")
         return results

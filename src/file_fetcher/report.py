@@ -5,7 +5,7 @@ from file_fetcher.scanner import MediaEntry
 from file_fetcher.ratings import Ratings
 
 if TYPE_CHECKING:
-    from file_fetcher.config import SearchConfig
+    from file_fetcher.config import AppConfig
     from file_fetcher.sftp_client import SFTPDownloader
 
 def format_size(size_bytes: int) -> str:
@@ -20,7 +20,7 @@ def format_size(size_bytes: int) -> str:
 def display_report_and_download(
     entries: list[MediaEntry], 
     entry_ratings: list[Ratings],
-    search_config: "SearchConfig", 
+    app_config: "AppConfig", 
     downloader: "SFTPDownloader"
 ) -> None:
     if not entries:
@@ -94,6 +94,22 @@ def display_report_and_download(
             sys.exit(130)
             
     paths_to_download = [entry.remote_path for entry in selected_entries]
-    print(f"\n🚀  Downloading {len(paths_to_download)} item(s)...")
-    downloader.download_paths(paths_to_download)
-    downloader.print_summary()
+
+    while True:
+        action = input("\nDo you want to (d)ownload immediately, or (q)ueue for later? [d/q]: ").strip().lower()
+        if action in ('d', 'q'):
+            break
+        print("⚠️  Invalid choice. Please enter 'd' or 'q'.")
+
+    if action == 'q':
+        try:
+            with open(app_config.file_list_path, 'a', encoding='utf-8') as f:
+                for p in paths_to_download:
+                    f.write(f"{p}\n")
+            print(f"\n📝  Added {len(paths_to_download)} item(s) to '{app_config.file_list_path}'.")
+        except Exception as e:
+            print(f"❌  Failed to write to file list: {e}")
+    else:
+        print(f"\n🚀  Downloading {len(paths_to_download)} item(s)...")
+        downloader.download_paths(paths_to_download)
+        downloader.print_summary()

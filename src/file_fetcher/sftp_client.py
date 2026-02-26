@@ -103,6 +103,7 @@ class SFTPDownloader:
     def _is_dir(self, remote_path: str) -> bool:
         """Check if a remote path is a directory."""
         try:
+            logger.debug(f"SFTP stat: {remote_path}")
             st = self.sftp.stat(remote_path)
             return stat.S_ISDIR(st.st_mode)  # type: ignore[arg-type]
         except FileNotFoundError:
@@ -111,6 +112,7 @@ class SFTPDownloader:
 
     def _download_dir(self, remote_dir: str) -> None:
         """Recursively download a remote directory."""
+        logger.debug(f"SFTP listdir_attr: {remote_dir}")
         entries = self.sftp.listdir_attr(remote_dir)
         for entry in entries:
             remote_child = f"{remote_dir.rstrip('/')}/{entry.filename}"
@@ -158,6 +160,7 @@ class SFTPDownloader:
         # Ensure local directory exists
         local_path.parent.mkdir(parents=True, exist_ok=True)
 
+        logger.debug(f"SFTP stat: {remote_path}")
         remote_stat = self.sftp.stat(remote_path)
         remote_size: int = remote_stat.st_size  # type: ignore[assignment]
 
