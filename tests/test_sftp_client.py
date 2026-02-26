@@ -170,3 +170,55 @@ class TestIsDir:
         dl.sftp.stat.return_value = _mock_stat(1000, is_dir=False)
 
         assert dl._is_dir("/some/file.mkv") is False
+
+
+class TestHostKeyVerification:
+    """Test SFTP host-key fingerprint verification."""
+
+    def _fingerprint_for(self, key_bytes: bytes) -> str:
+        import base64, hashlib
+        raw = base64.b64encode(hashlib.sha256(key_bytes).digest()).decode().rstrip("=")
+        return f"SHA256:{raw}"
+
+    def test_skipped_when_no_fingerprint(self, tmp_path: Path) -> None:
+        """Verification should be a no-op when no fingerprint is set."""
+        config = _make_config(tmp_path)
+        assert config.sftp_host_key_fingerprint is None
+        dl = SFTPDownloader(config)
+        dl._transport = MagicMock()
+        # Should not raise
+        dl._verify_host_key()
+
+    def test_passes_on_matching_fingerprint(self, tmp_path: Path) -> None:
+        key_bytes = b"fake-host-key-data"
+        expected_fp = self._fingerprint_for(key_bytes)
+
+        config = _make_config(tmp_path)
+        config.sftp_host_key_fingerprint = expected_fp
+
+        dl = SFTPDownloader(config)
+        mock_transport = MagicMock()
+        mock_key = MagicMock()
+        mock_key.asbytes.return_value = key_bytes
+        mock_transport.get_remote_server_key.return_value = mock_key
+        dl._transport = mock_transport
+
+        # Should not raise
+        dl._verify_host_key()
+
+    def test_raises_on_mismatched_fingerprint(self, tmp_path: Path) -> None:
+        config = _make_config(tmp_path)
+        config.sftp_host_key_fingerprint = "SHA256:wrong_fingerprint"
+
+        dl = SFTPDownloader(config)
+        mock_transport = MagicMock()
+        mock_key = MagicMock()
+        mock_key.asbytes.return_value = b"real-host-key-data"
+        mock_transport.get_remote_server_key.return_value = mock_key
+        dl._transport = mock_transport
+
+        with pytest.raises(RuntimeError, match="Host-key verification failed"):
+            dl._verify_host_key()
+
+        mock_transport.close.assert_called_once()
+        assert dl._transport is None

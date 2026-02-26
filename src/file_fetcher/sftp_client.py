@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import os
 import stat
 import time
@@ -46,9 +48,39 @@ class SFTPDownloader:
             username=self.config.sftp_user,
             password=self.config.sftp_password,
         )
+        self._verify_host_key()
         self._sftp = paramiko.SFTPClient.from_transport(self._transport)
         logger.info("SFTP connection established successfully")
         print("✅  Connected.\n")
+
+    def _verify_host_key(self) -> None:
+        """Verify the server's host-key fingerprint if one is configured.
+
+        Skips verification when ``sftp_host_key_fingerprint`` is ``None``.
+        """
+        expected = self.config.sftp_host_key_fingerprint
+        if expected is None:
+            logger.debug("Host-key verification skipped (no fingerprint configured)")
+            return
+
+        assert self._transport is not None
+        host_key = self._transport.get_remote_server_key()
+        raw_fingerprint = base64.b64encode(
+            hashlib.sha256(host_key.asbytes()).digest()
+        ).decode().rstrip("=")
+        actual = f"SHA256:{raw_fingerprint}"
+
+        if actual != expected:
+            self._transport.close()
+            self._transport = None
+            msg = (
+                f"Host-key verification failed! "
+                f"Expected {expected}, got {actual}. Possible MITM attack."
+            )
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        logger.info("Host-key fingerprint verified successfully")
 
     def disconnect(self) -> None:
         """Close the SFTP session."""

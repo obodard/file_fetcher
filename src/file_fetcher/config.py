@@ -33,6 +33,9 @@ class AppConfig:
     # Scheduling (None = start immediately)
     scheduled_at: Optional[datetime] = None
 
+    # Host-key verification (None = skip verification)
+    sftp_host_key_fingerprint: Optional[str] = None
+
     # Retry
     max_retries: int = 3
     retry_delay: float = 5.0  # seconds
@@ -61,6 +64,7 @@ def load_config(
     sftp_port = int(os.getenv("SFTP_PORT", "22"))
     sftp_user = _require_env("SFTP_USER")
     sftp_password = _require_env("SFTP_PASSWORD")
+    sftp_host_key_fingerprint = os.getenv("SFTP_HOST_KEY_FINGERPRINT") or None
 
     file_list_path = Path(os.getenv("FILE_LIST", "files_to_download.txt"))
     download_dir = Path(os.getenv("DOWNLOAD_DIR", "./downloads"))
@@ -76,6 +80,7 @@ def load_config(
         sftp_port=sftp_port,
         sftp_user=sftp_user,
         sftp_password=sftp_password,
+        sftp_host_key_fingerprint=sftp_host_key_fingerprint,
         file_list_path=file_list_path,
         download_dir=download_dir,
         remote_paths=remote_paths,
