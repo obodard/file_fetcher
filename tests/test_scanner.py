@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import stat
 
 from file_fetcher.scanner import SFTPScanner
-from file_fetcher.llm.base import SearchFilters
+
 
 def test_scan_filters_by_age():
     mock_sftp = MagicMock()
@@ -34,8 +34,7 @@ def test_scan_filters_by_age():
     mock_sftp.listdir_attr.side_effect = mock_listdir
     scanner = SFTPScanner(mock_downloader)
     
-    filters = SearchFilters(media_type="movies", max_age_days=30)
-    results = scanner.scan(filters)
+    results = scanner.scan(media_type="movies", max_age_days=30)
     
     assert len(results) == 1
     assert results[0].title == "Recent Movie"
@@ -67,8 +66,7 @@ def test_scan_filters_by_keyword():
     mock_sftp.listdir_attr.side_effect = mock_listdir
     scanner = SFTPScanner(mock_downloader)
     
-    filters = SearchFilters(media_type="movies", keywords=["Avatar", "water"])
-    results = scanner.scan(filters)
+    results = scanner.scan(media_type="movies", keywords=["Avatar", "water"])
     
     assert len(results) == 1
     assert results[0].title == "Avatar The Way of Water"

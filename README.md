@@ -10,7 +10,6 @@
 - ⏰ **Scheduled downloads** — optionally start at a specific date/time
 - 🔄 **Resume & retry** — interrupted downloads resume automatically; failures retry with back-off
 - 📊 **Progress bars** — real-time tqdm progress for every file
-- 🔐 **Password auth** — designed for servers without SSH key exchange
 - 📂 **Recursive folders** — directories are downloaded recursively, preserving structure
 - 🌍 **Special characters** — handles spaces, accents, and special characters in paths
 
@@ -103,28 +102,17 @@ Omit the `schedule` section (or leave it commented out) to start downloading imm
 
 ---
 
-## Phase 2 — Media Discovery Server Search
+## Intelligent Search (Google ADK + Gemini)
 
-File Fetcher supports finding media on your server using natural language (powered by **Ollama** or **Gemini**) and augmenting it with ratings from **OMDb (Rotten Tomatoes & IMDb)** before downloading.
+File Fetcher supports finding media on your server using natural language. It uses a **Google ADK agent** backed by **Gemini** — the agent autonomously searches your SFTP server, fetches ratings from **OMDb (IMDb & Rotten Tomatoes)**, and semantically filters results before presenting them.
 
-### 1. Set up an LLM (Ollama recommended)
+### 1. Set up Google API Key
 
-File Fetcher uses local LLMs via Ollama to parse your search queries privately.
+Get a Gemini API key from the [Google AI Studio](https://aistudio.google.com/apikey) and add it to your `.env`:
 
-1. **Install Ollama**
-   - macOS: `brew install ollama`
-   - Linux: `curl -fsSL https://ollama.com/install.sh | sh`
-2. **Download a model**
-   Run the following to pull the recommended model (Llama 3):
-   ```bash
-   ollama pull llama3
-   ```
-3. **Start the server** (if not running automatically)
-   ```bash
-   ollama serve
-   ```
-
-*(Alternatively, you can use Google Gemini by setting `LLM_PROVIDER=gemini` and providing a `GEMINI_API_KEY` in your `.env`)*
+```env
+GOOGLE_API_KEY=your_google_api_key
+```
 
 ### 2. Set up OMDb API Key
 
@@ -193,15 +181,13 @@ Both TV shows and Movies are fully supported. Find items on the server by descri
 ```
 
 The app will:
-1. Parse your intent with Ollama.
-2. Scan the remote server over SFTP.
-3. Lookup IMDb and Rotten Tomatoes ratings.
-4. Prompt you to download!
+1. Send your query to an ADK agent (Gemini).
+2. The agent scans the remote server over SFTP.
+3. The agent looks up IMDb and Rotten Tomatoes ratings.
+4. Results are semantically filtered and you're prompted to download!
 
 ```
-🧠  Parsing query with ollama...
-
-📡  Scanning server for matching media...
+🤖  Sending query to ADK agent (model: gemini-2.5-flash)…
 
 ─────────────────────────────────────────────────────────────────────────────────────
  #   | Title                                    | Year  | RT    | IMDb  | Uploaded  
@@ -272,7 +258,14 @@ file_fetcher/
 │   ├── config.py               # Configuration loader
 │   ├── scheduler.py            # Wait-until-target-time
 │   ├── sftp_client.py          # SFTP download engine
-│   └── progress.py             # tqdm progress wrapper
+│   ├── scanner.py              # SFTP media scanner
+│   ├── ratings.py              # OMDb API client
+│   ├── report.py               # CLI report & download prompt
+│   ├── progress.py             # tqdm progress wrapper
+│   └── agent/                  # ADK agent (Gemini-backed)
+│       ├── __init__.py
+│       ├── agent.py            # Agent definition & runner
+│       └── tools.py            # ADK tool factories
 │
 └── tests/                      # Unit tests
 ```
