@@ -9,7 +9,6 @@ from file_fetcher import logger
 from file_fetcher.title_parser import parse_title_and_year
 
 if TYPE_CHECKING:
-    from file_fetcher.llm.base import SearchFilters
     from file_fetcher.sftp_client import SFTPDownloader
 
 @dataclass
@@ -27,13 +26,13 @@ class SFTPScanner:
     def __init__(self, downloader: "SFTPDownloader"):
         self.sftp = downloader.sftp
         
-    def scan(self, filters: "SearchFilters") -> list[MediaEntry]:
-        """Find media matching the filters."""
+    def scan(self, media_type: str = "all", year: int | None = None, max_age_days: int | None = None, keywords: list[str] | None = None) -> list[MediaEntry]:
+        """Find media matching the criteria."""
         # Define base dirs based on media type
         base_dirs = []
-        if filters.media_type in ("movies", "all"):
+        if media_type in ("movies", "all"):
             base_dirs.extend(["Media1/Films", "Media2/Films", "Media1/4k", "Media2/4k"])
-        if filters.media_type in ("tv", "all"):
+        if media_type in ("tv", "all"):
             base_dirs.extend(["Media1/Séries TV", "Media2/Séries TV"])
             
         results = []
@@ -55,28 +54,28 @@ class SFTPScanner:
                 mod_date = datetime.fromtimestamp(mtime)
                 
                 # Filter by max age
-                if filters.max_age_days is not None:
+                if max_age_days is not None:
                     age_days = (now - mod_date).days
-                    if age_days > filters.max_age_days:
+                    if age_days > max_age_days:
                         continue
                         
-                title, year = parse_title_and_year(filename)
+                title, parsed_year = parse_title_and_year(filename)
                 
                 # Filter by year
-                if filters.year is not None and year != filters.year:
+                if year is not None and parsed_year != year:
                     continue
                     
                 # Filter by keywords
-                if filters.keywords:
+                if keywords:
                     lower_filename = filename.lower()
-                    if not all(kw.lower() in lower_filename for kw in filters.keywords):
+                    if not all(kw.lower() in lower_filename for kw in keywords):
                         continue
                 
                 entry_media_type = "tv" if "Séries TV" in base_dir else "movie"
                 
                 results.append(MediaEntry(
                     title=title,
-                    year=year,
+                    year=parsed_year,
                     remote_path=f"{base_dir}/{filename}",
                     modified_date=mod_date,
                     size_bytes=entry.st_size,

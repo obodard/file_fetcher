@@ -10,7 +10,6 @@
 - ⏰ **Scheduled downloads** — optionally start at a specific date/time
 - 🔄 **Resume & retry** — interrupted downloads resume automatically; failures retry with back-off
 - 📊 **Progress bars** — real-time tqdm progress for every file
-- 🔐 **Password auth** — designed for servers without SSH key exchange
 - 📂 **Recursive folders** — directories are downloaded recursively, preserving structure
 - 🌍 **Special characters** — handles spaces, accents, and special characters in paths
 
