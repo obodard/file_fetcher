@@ -42,11 +42,8 @@ class AppConfig:
 
 @dataclass
 class SearchConfig:
-    """Holds configuration for Phase 2 search/LLM features."""
-    llm_provider: str
-    ollama_model: str
-    ollama_host: str
-    gemini_api_key: str
+    """Holds configuration for ADK-based intelligent search."""
+    google_api_key: str
     gemini_model: str
     omdb_api_key: str
 
@@ -92,22 +89,16 @@ def load_search_config(env_path: str | Path = ".env") -> SearchConfig:
     """Build a ``SearchConfig`` from .env."""
     load_dotenv(env_path)
 
-    llm_provider = os.getenv("LLM_PROVIDER", "ollama")
-    ollama_model = os.getenv("OLLAMA_MODEL", "llama3")
-    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-    gemini_api_key = os.getenv("GEMINI_API_KEY", "")
+    google_api_key = os.getenv("GOOGLE_API_KEY", "")
+    if not google_api_key:
+        print("❌  Missing GOOGLE_API_KEY — required for ADK agent.", file=sys.stderr)
+        sys.exit(1)
+
     gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     omdb_api_key = _require_env("OMDB_API_KEY")
 
-    if llm_provider == "gemini" and not gemini_api_key:
-        print("❌  Missing GEMINI_API_KEY for LLM_PROVIDER=gemini", file=sys.stderr)
-        sys.exit(1)
-
     return SearchConfig(
-        llm_provider=llm_provider,
-        ollama_model=ollama_model,
-        ollama_host=ollama_host,
-        gemini_api_key=gemini_api_key,
+        google_api_key=google_api_key,
         gemini_model=gemini_model,
         omdb_api_key=omdb_api_key,
     )
@@ -240,7 +231,7 @@ def setup_logging(app_config: AppConfig, search_config: Optional[SearchConfig] =
     ]
     if search_config:
         secrets.extend([
-            search_config.gemini_api_key,
+            search_config.google_api_key,
             search_config.omdb_api_key
         ])
 

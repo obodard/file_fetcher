@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from file_fetcher.config import load_config, load_search_config, setup_logging
@@ -53,57 +54,74 @@ def handle_download() -> None:
 
 
 def handle_search(query: str) -> None:
-    """Run the intelligent media search flow."""
+    """Run the intelligent media search flow via ADK agent."""
     config = load_config()
     search_config = load_search_config()
     setup_logging(config, search_config)
     from file_fetcher import logger
     logger.info(f"Command executed: {' '.join(sys.argv)}")
-    
-    print(f"\n🧠  Parsing query with {search_config.llm_provider}...")
-    if search_config.llm_provider == "ollama":
-        from file_fetcher.llm.ollama_provider import OllamaProvider
-        provider = OllamaProvider(search_config.ollama_host, search_config.ollama_model)
-    elif search_config.llm_provider == "gemini":
-        from file_fetcher.llm.gemini_provider import GeminiProvider
-        provider = GeminiProvider(search_config.gemini_api_key, search_config.gemini_model)
-    else:
-        print(f"❌  Unknown LLM provider: {search_config.llm_provider}")
-        sys.exit(1)
-        
-    filters = provider.parse_query(query)
-    
+
+    # ADK reads GOOGLE_API_KEY from the environment automatically.
+    # Ensure it is set (load_search_config already validated it).
+    os.environ.setdefault("GOOGLE_API_KEY", search_config.google_api_key)
+
     try:
         with SFTPDownloader(config) as downloader:
-            print("\n📡  Scanning server for matching media...")
             scanner = SFTPScanner(downloader)
-            entries = scanner.scan(filters)
-            
-            # Pre-fetch OMDb metadata. We need it for both post-filtering (if applicable) and reporting.
+
+            # Build the ADK agent with tools bound to this scanner/config
+            from file_fetcher.agent import create_agent, run_agent
+
+            print(f"\n🤖  Sending query to ADK agent (model: {search_config.gemini_model})…")
+            agent = create_agent(
+                scanner=scanner,
+                omdb_api_key=search_config.omdb_api_key,
+                model=search_config.gemini_model,
+            )
+
+            selected = run_agent(agent, query)
+
+            if not selected:
+                print("\n🔍  No media found matching your query.")
+                return
+
+            # The agent returns indices that reference the scanner's last result set.
+            # Re-run a broad scan to get the full MediaEntry list, then pick the
+            # entries/ratings the agent chose.
+            #
+            # Because the agent already called search_sftp_server (which ran
+            # scanner.scan()), we re-scan with the same broad filters to rebuild
+            # the list.  The agent's indices are relative to ITS search call, so
+            # we need to replicate that.  For simplicity we do a fresh all-scan
+            # and pair entries by title+year.
+            all_entries = scanner.scan()
+            entry_map = {
+                (e.title, e.year): e for e in all_entries
+            }
+
+            matched_entries = []
+            for item in selected:
+                title = item.get("title", "")
+                # Try exact match by title; fall back to index
+                found = None
+                for e in all_entries:
+                    if e.title.lower() == title.lower():
+                        found = e
+                        break
+                if found:
+                    matched_entries.append(found)
+
+            if not matched_entries:
+                print("\n🔍  Agent selected items but they could not be mapped back to server entries.")
+                return
+
+            # Fetch ratings for the matched entries
             ratings_list = [
-                get_ratings(e.title, e.year, search_config.omdb_api_key) for e in entries
+                get_ratings(e.title, e.year, search_config.omdb_api_key)
+                for e in matched_entries
             ]
-            
-            if filters.semantic_query and entries:
-                print(f"🕵️  Post-filtering {len(entries)} items based on semantic query...")
-                candidates = []
-                for i, (entry, rating) in enumerate(zip(entries, ratings_list)):
-                    candidates.append({
-                        "index": i,
-                        "title": entry.title,
-                        "plot": rating.plot,
-                        "genre": rating.genre,
-                        "actors": rating.actors,
-                        "director": rating.director
-                    })
-                    
-                matched_indices = provider.filter_candidates(filters.semantic_query, candidates)
-                
-                # Keep only matched entries
-                entries = [entries[i] for i in matched_indices if 0 <= i < len(entries)]
-                ratings_list = [ratings_list[i] for i in matched_indices if 0 <= i < len(ratings_list)]
-            
-            display_report_and_download(entries, ratings_list, config, downloader)
+
+            display_report_and_download(matched_entries, ratings_list, config, downloader)
     except KeyboardInterrupt:
         print("\n\n⛔  Interrupted by user.")
         sys.exit(130)
