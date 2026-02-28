@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "macros/cards.html" import poster_card %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  {# Filter bar — genre, year, rating, availability, AI toggle #}
+  {% include "partials/filter_bar.html" %}
+
+  {# Films / Series tabs — DaisyUI tabs, role="tablist" #}
+  <div role="tablist" class="tabs tabs-lifted">
+    <a href="/"
+       role="tab"
+       class="tab {% if not current_type %}tab-active{% endif %}"
+       {% if not current_type %}aria-selected="true"{% else %}aria-selected="false"{% endif %}>
+      All
+    </a>
+    <a href="/?type=movie"
+       role="tab"
+       class="tab {% if current_type == 'movie' %}tab-active{% endif %}"
+       {% if current_type == 'movie' %}aria-selected="true"{% else %}aria-selected="false"{% endif %}>
+      Films
+    </a>
+    <a href="/?type=series"
+       role="tab"
+       class="tab {% if current_type == 'series' %}tab-active{% endif %}"
+       {% if current_type == 'series' %}aria-selected="true"{% else %}aria-selected="false"{% endif %}>
+      Series
+    </a>
+  </div>
+
+  {# Grid container — HTMX search target #}
+  <div id="grid-container">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4" id="grid-inner">
+      {% if entries %}
+        {% for entry in entries %}
+          {{ poster_card(entry) }}
+        {% endfor %}
+      {% else %}
+        {% include "partials/empty_state.html" %}
+      {% endif %}
+    </div>
+  </div>
+  {# Scroll spinner — shown while HTMX infinite scroll fetches next page #}
+  <div id="scroll-spinner" class="htmx-indicator flex justify-center py-4">
+    <span class="loading loading-spinner loading-md"></span>
+  </div>
+
+</div>
+{% endblock %}

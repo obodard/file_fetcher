@@ -1,0 +1,54 @@
+{% macro poster_card(entry) %}
+{%- set is_local = entry.availability in ("in_collection", "both") -%}
+{%- set is_queued = entry.availability == "remote_only_downloading" -%}
+{%- set show_add_btn = not is_local and not is_queued -%}
+<div class="card card-compact bg-base-200 shadow hover:shadow-lg transition-shadow group relative cursor-pointer">
+
+  {# Poster image — 2:3 aspect ratio #}
+  <figure class="overflow-hidden rounded-t-2xl">
+    <img
+      src="/api/posters/{{ entry.id }}"
+      alt="{{ entry.title | e }} poster"
+      loading="lazy"
+      class="aspect-[2/3] w-full object-cover"
+    />
+  </figure>
+
+  {# Title overlay #}
+  <div class="card-body p-2">
+    <h2 class="card-title text-sm line-clamp-2">
+      {{ entry.title | e }}
+      {% if entry.year %}
+        <span class="text-xs font-normal opacity-60">({{ entry.year }})</span>
+      {% endif %}
+    </h2>
+
+    {# Availability badge #}
+    <div class="mt-1">
+      {% if is_local %}
+        <span class="badge badge-success badge-sm">In Collection</span>
+      {% elif is_queued %}
+        <span class="badge badge-info badge-sm">Downloading</span>
+      {% else %}
+        <span class="badge badge-ghost badge-sm">Remote</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Quick-add hover button — only shown when not local and not queued #}
+  {% if show_add_btn %}
+  <div class="absolute inset-0 flex items-end justify-center pb-4 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-base-300/80 to-transparent rounded-2xl pointer-events-none group-hover:pointer-events-auto">
+    <button
+      class="btn btn-primary btn-sm"
+      hx-post="/api/queue/add"
+      hx-vals='{"catalog_id": {{ entry.id }}}'
+      hx-target="closest .card"
+      hx-swap="outerHTML"
+    >
+      + Queue
+    </button>
+  </div>
+  {% endif %}
+
+</div>
+{% endmacro %}

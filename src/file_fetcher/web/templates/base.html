@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}{{ title | default("file_fetcher") }}{% endblock %}</title>
+
+  <!-- DaisyUI + Tailwind CSS (build artifact) -->
+  <link rel="stylesheet" href="{{ request.url_for('static', path='css/app.css') }}" />
+
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+
+  <!-- App JS -->
+  <script src="{{ request.url_for('static', path='js/app.js') }}" defer></script>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+
+  <!-- Accessibility: skip link -->
+  <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 z-50 btn btn-sm btn-primary">
+    Skip to content
+  </a>
+
+  <!-- Navbar -->
+  {% block nav %}
+    {% include "navbar.html" %}
+  {% endblock %}
+
+  <!-- Main content -->
+  <main id="main-content" class="container mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+</body>
+</html>

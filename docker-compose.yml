@@ -52,3 +52,18 @@ services:
     volumes:
       - ${LOCAL_FILMS_PATH:-/tmp/films}:/data/films:ro
       - ${LOCAL_SERIES_PATH:-/tmp/series}:/data/series:ro
+
+  web:
+    image: file_fetcher:latest
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["uvicorn", "file_fetcher.web.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ${DOWNLOAD_DIR:-/tmp/downloads}:/data/downloads

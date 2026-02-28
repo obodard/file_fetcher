@@ -363,6 +363,45 @@ The watcher is **event-based** (powered by [watchdog](https://pypi.org/project/w
 
 ---
 
+## Web UI
+
+The web interface is served by [FastAPI](https://fastapi.tiangolo.com/) with Jinja2 templates, styled using [Tailwind CSS](https://tailwindcss.com/) + [DaisyUI](https://daisyui.com/), and enhanced with [HTMX](https://htmx.org/).
+
+### Building the CSS
+
+Node.js and npm are required only to compile the CSS. The compiled file (`app.css`) is **not** committed to the repository.
+
+```bash
+# Install Tailwind + DaisyUI (one-time)
+npm install
+
+# Build CSS (minified)
+npm run build:css
+
+# Watch mode during development
+npm run watch:css
+```
+
+The build command in full:
+
+```bash
+tailwindcss -i ./src/file_fetcher/web/static/css/input.css \
+            -o ./src/file_fetcher/web/static/css/app.css \
+            --minify
+```
+
+### Starting the web service
+
+```bash
+# Via Docker Compose
+docker compose up web
+
+# Local development (requires compiled CSS)
+uvicorn file_fetcher.web.app:app --reload --port 8000
+```
+
+---
+
 ## License
 
 See [LICENSE](LICENSE).

@@ -1,0 +1,137 @@
+<%- Filter bar — HTMX-driven; updates #grid-container on any change -%>
+<form
+  id="filter-bar"
+  hx-get="/api/grid"
+  hx-trigger="change"
+  hx-target="#grid-container"
+  hx-swap="innerHTML"
+  hx-push-url="true"
+  class="flex flex-wrap gap-3 items-end py-3"
+>
+  {# Hidden base fields propagated from current page state #}
+  <input type="hidden" name="q" value="{{ current_q | default('') }}" />
+  <input type="hidden" name="type" value="{{ current_type | default('') }}" />
+
+  {# Genre multi-select #}
+  <div>
+    <label for="filter-genre" class="label label-text text-xs font-semibold">Genre</label>
+    <select
+      id="filter-genre"
+      name="genre"
+      class="select select-bordered select-sm"
+      aria-multiselectable="true"
+    >
+      <option value="">All genres</option>
+      {% for g in available_genres | default([]) %}
+        <option value="{{ g }}" {% if current_genre == g %}selected{% endif %}>{{ g }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  {# Year range #}
+  <div class="flex gap-2 items-end">
+    <div>
+      <label for="filter-year-min" class="label label-text text-xs font-semibold">Year from</label>
+      <input
+        id="filter-year-min"
+        name="year_min"
+        type="number"
+        min="1900"
+        max="2099"
+        placeholder="1900"
+        value="{{ current_year_min | default('') }}"
+        class="input input-bordered input-sm w-24"
+      />
+    </div>
+    <div>
+      <label for="filter-year-max" class="label label-text text-xs font-semibold">to</label>
+      <input
+        id="filter-year-max"
+        name="year_max"
+        type="number"
+        min="1900"
+        max="2099"
+        placeholder="2099"
+        value="{{ current_year_max | default('') }}"
+        class="input input-bordered input-sm w-24"
+      />
+    </div>
+  </div>
+
+  {# Minimum rating slider #}
+  <div>
+    <label for="filter-rating" class="label label-text text-xs font-semibold">
+      Min rating: <span id="rating-val">{{ current_min_rating | default('0') }}</span>
+    </label>
+    <input
+      id="filter-rating"
+      name="min_rating"
+      type="range"
+      min="0"
+      max="10"
+      step="0.5"
+      value="{{ current_min_rating | default('0') }}"
+      class="range range-sm range-primary w-32"
+      aria-valuenow="{{ current_min_rating | default('0') }}"
+      aria-valuemin="0"
+      aria-valuemax="10"
+      oninput="document.getElementById('rating-val').textContent = this.value; this.setAttribute('aria-valuenow', this.value)"
+    />
+  </div>
+
+  {# Availability filter #}
+  <fieldset>
+    <legend class="label label-text text-xs font-semibold">Availability</legend>
+    <div class="flex gap-2">
+      <label class="flex items-center gap-1 cursor-pointer text-sm">
+        <input type="radio" name="availability" value="" class="radio radio-sm"
+          {% if not current_availability %}checked{% endif %} />
+        All
+      </label>
+      <label class="flex items-center gap-1 cursor-pointer text-sm">
+        <input type="radio" name="availability" value="local" class="radio radio-sm radio-success"
+          {% if current_availability == 'local' %}checked{% endif %} />
+        Local
+      </label>
+      <label class="flex items-center gap-1 cursor-pointer text-sm">
+        <input type="radio" name="availability" value="queued" class="radio radio-sm radio-info"
+          {% if current_availability == 'queued' %}checked{% endif %} />
+        Queued
+      </label>
+    </div>
+  </fieldset>
+
+  {# AI mode toggle #}
+  <div>
+    <label class="label label-text text-xs font-semibold">&nbsp;</label>
+    <button
+      id="ai-toggle"
+      type="button"
+      role="switch"
+      aria-pressed="{{ 'true' if current_ai else 'false' }}"
+      aria-label="AI Search mode {% if current_ai %}active{% else %}inactive{% endif %}"
+      class="btn btn-sm {% if current_ai %}btn-primary{% else %}btn-ghost border{% endif %} gap-2"
+      onclick="toggleAiMode(this)"
+    >
+      <span aria-hidden="true">🤖</span>
+      AI
+      {% if current_ai %}
+        <span class="badge badge-xs badge-secondary animate-pulse" aria-label="AI Search mode active">ON</span>
+      {% endif %}
+    </button>
+    <input type="hidden" id="ai-hidden" name="ai" value="{{ current_ai | default('0') }}" />
+  </div>
+
+</form>
+
+{# Load-more button — shown when IntersectionObserver is unsupported (app.js feature-detect) #}
+<button
+  id="load-more-btn"
+  class="btn btn-outline btn-sm mt-4 hidden"
+  hx-get="/api/grid"
+  hx-target="#grid-container"
+  hx-swap="beforeend"
+  onclick="loadMoreManual(this)"
+>
+  Load more
+</button>

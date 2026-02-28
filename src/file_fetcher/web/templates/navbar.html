@@ -1,0 +1,57 @@
+<nav class="navbar bg-base-200 shadow-sm px-4 gap-4">
+  <!-- Logo -->
+  <div class="navbar-start">
+    <a href="/" class="text-xl font-bold tracking-tight text-primary select-none">
+      🎬 file_fetcher
+    </a>
+  </div>
+
+  <!-- Search bar -->
+  <div class="navbar-center flex-1 max-w-xl">
+    <div role="search" class="w-full">
+      <input
+        type="search"
+        id="search-input"
+        name="q"
+        placeholder="Search titles…"
+        class="input input-bordered w-full"
+        hx-get="/api/grid"
+        hx-trigger="keyup changed delay:300ms"
+        hx-target="#grid-container"
+        hx-include="[name='media_type']"
+        autocomplete="off"
+      />
+    </div>
+  </div>
+
+  <!-- Right side controls -->
+  <div class="navbar-end gap-2">
+    <!-- Films / Series tabs -->
+    <div role="tablist" class="tabs tabs-boxed hidden sm:flex">
+      <a href="/?media_type=film"
+         role="tab"
+         class="tab"
+         name="media_type"
+         value="film">Films</a>
+      <a href="/?media_type=series"
+         role="tab"
+         class="tab"
+         name="media_type"
+         value="series">Series</a>
+    </div>
+
+    <!-- Queue badge link -->
+    <a href="/queue" class="btn btn-ghost btn-sm relative">
+      Queue
+      <span id="queue-badge" class="badge badge-primary badge-xs absolute -top-1 -right-1 hidden">0</span>
+    </a>
+
+    <!-- Settings link -->
+    <a href="/settings" class="btn btn-ghost btn-sm">Settings</a>
+
+    <!-- Theme toggle -->
+    <button id="theme-toggle" class="btn btn-ghost btn-sm btn-circle" aria-label="Toggle theme">
+      🌙
+    </button>
+  </div>
+</nav>
