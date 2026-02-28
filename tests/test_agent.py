@@ -2,14 +2,18 @@
 
 from unittest.mock import Mock, MagicMock, patch
 from datetime import datetime, timedelta
+import inspect
+import json
 
 from file_fetcher.agent.tools import (
     make_search_tool,
     make_ratings_tool,
+    make_catalog_search_tool,
     sanitize_query,
     _MAX_QUERY_LENGTH,
     _MAX_AGE_DAYS_CAP,
 )
+from file_fetcher.schemas.catalog import CatalogResult
 from file_fetcher.scanner import MediaEntry
 from file_fetcher.ratings import Ratings
 
@@ -121,3 +125,152 @@ def test_ratings_tool_without_year(mock_get_ratings):
     mock_get_ratings.assert_called_once_with("Unknown", None, "key123")
     assert result["status"] == "success"
     assert result["imdb"] == "N/A"
+
+
+# ── make_catalog_search_tool (Story 5.2) ─────────────────────────────────
+
+
+@patch("file_fetcher.services.catalog.search_catalog")
+@patch("file_fetcher.db.get_session")
+def test_catalog_search_tool_calls_search_catalog(mock_get_session, mock_search_catalog):
+    """Tool calls catalog_service.search_catalog and returns list of dicts."""
+    mock_result = CatalogResult(
+        id=1,
+        title="The Matrix",
+        year=1999,
+        media_type="film",
+        omdb_status="enriched",
+        availability="remote_only",
+        remote_paths=["/media/matrix.mkv"],
+        local_paths=[],
+        imdb_rating="8.7",
+        genre="Action, Sci-Fi",
+    )
+    mock_search_catalog.return_value = [mock_result]
+
+    # Patch get_session as context manager
+    mock_session = MagicMock()
+    mock_session_ctx = MagicMock()
+    mock_session_ctx.__enter__ = Mock(return_value=mock_session)
+    mock_session_ctx.__exit__ = Mock(return_value=False)
+    mock_get_session.return_value = mock_session_ctx
+
+    tool = make_catalog_search_tool()
+    results = tool(query="Matrix")
+
+    assert len(results) == 1
+    assert results[0]["title"] == "The Matrix"
+    assert results[0]["year"] == 1999
+    assert results[0]["availability"] == "remote_only"
+    assert results[0]["imdb_rating"] == "8.7"
+    assert results[0]["genre"] == "Action, Sci-Fi"
+
+
+@patch("file_fetcher.services.catalog.search_catalog")
+@patch("file_fetcher.db.get_session")
+def test_catalog_search_tool_with_media_type(mock_get_session, mock_search_catalog):
+    """Tool passes media_type through to search_catalog."""
+    mock_search_catalog.return_value = []
+    mock_session = MagicMock()
+    mock_session_ctx = MagicMock()
+    mock_session_ctx.__enter__ = Mock(return_value=mock_session)
+    mock_session_ctx.__exit__ = Mock(return_value=False)
+    mock_get_session.return_value = mock_session_ctx
+
+    tool = make_catalog_search_tool()
+    tool(query="sci-fi", media_type="film")
+
+    mock_search_catalog.assert_called_once_with(mock_session, "sci-fi", media_type="film", limit=50)
+
+
+@patch("file_fetcher.services.catalog.search_catalog")
+@patch("file_fetcher.db.get_session")
+def test_catalog_search_tool_empty_results(mock_get_session, mock_search_catalog):
+    """Tool returns empty list when no results found."""
+    mock_search_catalog.return_value = []
+    mock_session_ctx = MagicMock()
+    mock_session_ctx.__enter__ = Mock(return_value=MagicMock())
+    mock_session_ctx.__exit__ = Mock(return_value=False)
+    mock_get_session.return_value = mock_session_ctx
+
+    tool = make_catalog_search_tool()
+    results = tool(query="zzz_no_match")
+
+    assert results == []
+
+
+@patch("file_fetcher.db.get_session")
+def test_catalog_search_tool_db_error_returns_empty(mock_get_session):
+    """Tool returns empty list gracefully when DB raises an exception."""
+    mock_get_session.side_effect = Exception("DB connection failed")
+
+    tool = make_catalog_search_tool()
+    results = tool(query="anything")
+
+    assert results == []
+
+
+def test_catalog_search_tool_schema():
+    """search_catalog_db function has correct signature for ADK tool."""
+    tool = make_catalog_search_tool()
+    sig = inspect.signature(tool)
+    params = list(sig.parameters.keys())
+
+    assert "query" in params
+    assert "media_type" in params
+    # query has no default; media_type defaults to None
+    assert sig.parameters["media_type"].default is None
+
+
+# ── run_catalog_agent (Story 5.2) — graceful AI fallback ─────────────────
+
+@patch("file_fetcher.agent.agent.asyncio.run")
+def test_run_catalog_agent_parses_json_array(mock_asyncio_run):
+    """run_catalog_agent parses JSON array from agent response."""
+    from file_fetcher.agent.agent import run_catalog_agent
+
+    payload = json.dumps([
+        {"title": "Inception", "year": 2010, "media_type": "film",
+         "availability": "remote_only", "imdb_rating": "8.8", "genre": "Sci-Fi"},
+    ])
+    mock_asyncio_run.return_value = payload
+
+    results = run_catalog_agent(Mock(), "sci-fi")
+
+    assert len(results) == 1
+    assert results[0]["title"] == "Inception"
+
+
+@patch("file_fetcher.agent.agent.asyncio.run")
+def test_run_catalog_agent_handles_api_error_response(mock_asyncio_run):
+    """run_catalog_agent returns empty list on graceful error response."""
+    from file_fetcher.agent.agent import run_catalog_agent
+
+    mock_asyncio_run.return_value = '{"error": "AI search unavailable. Please try a direct search."}'
+
+    results = run_catalog_agent(Mock(), "sci-fi")
+    assert results == []
+
+
+@patch("file_fetcher.agent.agent.asyncio.run")
+def test_run_catalog_agent_empty_response_returns_empty(mock_asyncio_run):
+    """run_catalog_agent returns empty list when agent returns empty string."""
+    from file_fetcher.agent.agent import run_catalog_agent
+
+    mock_asyncio_run.return_value = ""
+
+    results = run_catalog_agent(Mock(), "anything")
+    assert results == []
+
+
+@patch("file_fetcher.agent.agent.asyncio.run")
+def test_run_catalog_agent_strips_markdown_fences(mock_asyncio_run):
+    """run_catalog_agent strips ```json ... ``` fences before parsing."""
+    from file_fetcher.agent.agent import run_catalog_agent
+
+    payload = '```json\n[{"title": "Dune", "year": 2021}]\n```'
+    mock_asyncio_run.return_value = payload
+
+    results = run_catalog_agent(Mock(), "dune")
+    assert len(results) == 1
+    assert results[0]["title"] == "Dune"
