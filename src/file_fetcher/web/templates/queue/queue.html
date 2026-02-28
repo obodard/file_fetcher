@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "macros/queue_item.html" import queue_item %}
+
+{% block title %}{{ title | default("Download Queue — file_fetcher") }}{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+  <h1 class="text-2xl font-bold">Download Queue</h1>
+
+  {% if entries %}
+  <div class="overflow-x-auto rounded-box border border-base-300">
+    <table class="table table-zebra w-full">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Progress</th>
+          <th>Priority</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody
+        id="queue-rows"
+        hx-get="/api/queue/rows"
+        hx-trigger="every {{ poll_interval }}s [document.visibilityState=='visible']"
+        hx-swap="innerHTML"
+      >
+        {% for item in entries %}
+          {{ queue_item(item) }}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  {# Empty state #}
+  <div class="flex flex-col items-center justify-center py-20 text-center opacity-60">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+      <path stroke-linecap="round" stroke-linejoin="round"
+        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+    <h3 class="text-xl font-semibold mb-2">Your queue is empty</h3>
+    <p class="text-sm max-w-xs mb-4">
+      Nothing is waiting to be downloaded right now.
+    </p>
+    <a href="/" class="btn btn-primary btn-sm">Browse Catalogue</a>
+  </div>
+  {% endif %}
+</div>
+
+{# Remove confirm modal #}
+<dialog id="remove-modal" class="modal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg">Remove from queue?</h3>
+    <p class="py-4">
+      Remove <strong id="remove-modal-title"></strong> from the download queue?
+    </p>
+    <div class="modal-action">
+      <button
+        id="remove-modal-confirm"
+        class="btn btn-error btn-sm"
+        hx-delete=""
+        hx-target="body"
+        hx-swap="none"
+        onclick="document.getElementById('remove-modal').close()"
+      >
+        Remove
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('remove-modal').close()">
+        Cancel
+      </button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endblock %}

@@ -1,0 +1,8 @@
+{#
+  queue_rows_fragment.html — renders <tr> elements only (no <tbody> wrapper).
+  Used by GET /api/queue/rows for HTMX polling (hx-swap="innerHTML" on <tbody>).
+#}
+{% from "macros/queue_item.html" import queue_item %}
+{% for item in entries %}
+  {{ queue_item(item) }}
+{% endfor %}

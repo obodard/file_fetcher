@@ -1,0 +1,8 @@
+{#
+  queue_row.html — single <tr> partial for OOB HTMX swap after per-item actions.
+  Variables:
+    - item : QueueRow dataclass
+    - hx_oob : bool (True → emit hx-swap-oob attr so HTMX replaces the correct row)
+#}
+{% from "macros/queue_item.html" import queue_item %}
+{{ queue_item(item) }}

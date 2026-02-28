@@ -205,3 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Tailwind CSS build artifact
+src/file_fetcher/web/static/css/app.css
+node_modules/

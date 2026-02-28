@@ -43,7 +43,13 @@
     <!-- Queue badge link -->
     <a href="/queue" class="btn btn-ghost btn-sm relative">
       Queue
-      <span id="queue-badge" class="badge badge-primary badge-xs absolute -top-1 -right-1 hidden">0</span>
+      <span
+        id="queue-badge"
+        class="badge badge-primary badge-xs absolute -top-1 -right-1 empty:hidden"
+        hx-get="/api/queue/badge"
+        hx-trigger="every 5s [document.visibilityState=='visible']"
+        hx-swap="innerHTML"
+      ></span>
     </a>
 
     <!-- Settings link -->

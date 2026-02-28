@@ -1,0 +1,103 @@
+{% macro queue_item(item) %}
+{%- set status_badge_class = {
+  "pending":     "badge-ghost",
+  "downloading": "badge-info",
+  "completed":   "badge-success",
+  "done":        "badge-success",
+  "failed":      "badge-error"
+}.get(item.status, "badge-ghost") -%}
+<tr id="row-{{ item.id }}">
+  {# Title #}
+  <td>
+    {% if item.catalog_id %}
+      <a href="/title/{{ item.catalog_id }}" class="link link-hover font-medium">
+        {{ item.title | e }}
+      </a>
+    {% else %}
+      <span class="font-medium">{{ item.title | e }}</span>
+    {% endif %}
+  </td>
+
+  {# Status badge #}
+  <td>
+    <span class="badge {{ status_badge_class }} badge-sm capitalize">
+      {{ item.status }}
+    </span>
+    {% if item.error_message %}
+      <div class="tooltip tooltip-bottom" data-tip="{{ item.error_message | e }}">
+        <span class="text-error text-xs ml-1 cursor-help">⚠</span>
+      </div>
+    {% endif %}
+  </td>
+
+  {# Progress bar — only visible when downloading #}
+  <td class="min-w-[8rem]">
+    {% if item.status == "downloading" %}
+      <progress
+        class="progress progress-info w-full"
+        value="{{ item.progress }}"
+        max="100"
+      ></progress>
+      <span class="text-xs opacity-60">{{ item.progress }}%</span>
+    {% else %}
+      <span class="text-xs opacity-40">—</span>
+    {% endif %}
+  </td>
+
+  {# Priority #}
+  <td>
+    <div class="flex items-center gap-1">
+      <span class="font-mono text-sm">{{ item.priority }}</span>
+      <div class="flex flex-col gap-0">
+        <button
+          class="btn btn-ghost btn-xs p-0 h-4 min-h-0 leading-none"
+          title="Increase priority"
+          hx-patch="/api/queue/{{ item.id }}/priority"
+          hx-vals='{"delta": 1}'
+          hx-target="body"
+          hx-swap="none"
+        >▲</button>
+        <button
+          class="btn btn-ghost btn-xs p-0 h-4 min-h-0 leading-none"
+          title="Decrease priority"
+          hx-patch="/api/queue/{{ item.id }}/priority"
+          hx-vals='{"delta": -1}'
+          hx-target="body"
+          hx-swap="none"
+        >▼</button>
+      </div>
+    </div>
+  </td>
+
+  {# Actions #}
+  <td>
+    <div class="flex gap-1 flex-wrap">
+      {% if item.status == "failed" %}
+        <button
+          class="btn btn-warning btn-xs"
+          hx-post="/api/queue/{{ item.id }}/retry"
+          hx-target="body"
+          hx-swap="none"
+        >
+          Retry
+        </button>
+      {% endif %}
+
+      <button
+        class="btn btn-error btn-xs"
+        data-queue-id="{{ item.id }}"
+        data-queue-title="{{ item.title | e }}"
+        hx-on::click="
+          document.getElementById('remove-modal-title').textContent = this.dataset.queueTitle;
+          var confirmBtn = document.getElementById('remove-modal-confirm');
+          confirmBtn.setAttribute('hx-delete', '/api/queue/' + this.dataset.queueId);
+          htmx.process(confirmBtn);
+          document.getElementById('remove-modal').showModal();
+        "
+      >
+        Remove
+      </button>
+    </div>
+  </td>
+</tr>
+{% endmacro %}

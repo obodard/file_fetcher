@@ -9,9 +9,11 @@ from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, Response
 
 from file_fetcher.db import get_session
+from file_fetcher.models.download_queue import DownloadQueue
+from file_fetcher.models.enums import DownloadStatus
 from file_fetcher.models.omdb_data import OmdbData
 from file_fetcher.services.catalog import get_by_id, search_catalog
-from file_fetcher.services.queue_service import AlreadyQueuedError, enqueue_catalog_entry
+from file_fetcher.services.queue_service import AlreadyQueuedError, enqueue_catalog_entry, remove_from_queue, retry_entry
 from file_fetcher.web.utils import make_toast
 
 log = logging.getLogger(__name__)
@@ -260,3 +262,131 @@ async def queue_download_now(
         toast_message="Download started!",
         toast_type="success",
     )
+
+
+# ── Story 9.1 — per-queue-item actions ────────────────────────────────────────
+
+
+def _render_queue_row_partial(request: Request, queue_id: int) -> str:
+    """Render a single queue row partial for OOB HTMX swap."""
+    from file_fetcher.web.routes.queue import _fetch_queue_rows  # avoid circular import at module level
+
+    # Refetch entries to get fresh state of the target row
+    entries = _fetch_queue_rows()
+    matching = [e for e in entries if e.id == queue_id]
+    if not matching:
+        return ""  # row deleted — return empty
+
+    templates = request.app.state.templates
+    html = templates.get_template("partials/queue_row.html").render(
+        {"item": matching[0], "request": request}
+    )
+    # Inject hx-swap-oob so HTMX replaces the correct <tr> in the DOM
+    oob_marker = f'hx-swap-oob="outerHTML:#row-{queue_id}"'
+    html = html.replace(f'id="row-{queue_id}"', f'id="row-{queue_id}" {oob_marker}', 1)
+    return html
+
+
+@router.delete("/queue/{queue_id}", response_class=HTMLResponse)
+async def queue_remove(request: Request, queue_id: int) -> HTMLResponse:
+    """Remove an entry from the download queue.
+
+    Returns 200 with an empty OOB fragment that removes the row from the DOM.
+    """
+    try:
+        with get_session() as session:
+            remove_from_queue(session, queue_id)
+    except ValueError:
+        return HTMLResponse(
+            content=make_toast("Queue entry not found.", "error"),
+            status_code=404,
+        )
+
+    # Return an OOB swap that removes the row
+    oob_html = f'<tr id="row-{queue_id}" hx-swap-oob="delete"></tr>'
+    return HTMLResponse(content=oob_html + make_toast("Removed from queue.", "info"))
+
+
+@router.post("/queue/{queue_id}/retry", response_class=HTMLResponse)
+async def queue_retry(request: Request, queue_id: int) -> HTMLResponse:
+    """Reset a failed queue entry back to pending.
+
+    Returns an updated row partial via OOB swap.
+    """
+    try:
+        with get_session() as session:
+            retry_entry(session, queue_id)
+    except ValueError:
+        return HTMLResponse(
+            content=make_toast("Queue entry not found.", "error"),
+            status_code=404,
+        )
+
+    row_html = _render_queue_row_partial(request, queue_id)
+    return HTMLResponse(content=row_html + make_toast("Retrying download…", "info"))
+
+
+@router.patch("/queue/{queue_id}/priority", response_class=HTMLResponse)
+async def queue_adjust_priority(
+    request: Request,
+    queue_id: int,
+    delta: int = Form(...),
+) -> HTMLResponse:
+    """Adjust the priority of a queue entry by +1 or -1 (clamped to >= 0).
+
+    Returns an updated row partial via OOB swap.
+    """
+    with get_session() as session:
+        entry = session.get(DownloadQueue, queue_id)
+        if entry is None:
+            return HTMLResponse(
+                content=make_toast("Queue entry not found.", "error"),
+                status_code=404,
+            )
+        new_priority = max(0, entry.priority + delta)
+        entry.priority = new_priority
+        session.commit()
+
+    row_html = _render_queue_row_partial(request, queue_id)
+    return HTMLResponse(content=row_html)
+
+
+# ── Story 9.2 — HTMX polling fragments ────────────────────────────────────────
+
+
+@router.get("/queue/rows", response_class=HTMLResponse)
+async def queue_rows_fragment(request: Request) -> HTMLResponse:
+    """Return the queue table body inner HTML for HTMX polling.
+
+    Renders ``partials/queue_rows_fragment.html`` — no base layout.
+    """
+    from file_fetcher.web.routes.queue import _fetch_queue_rows
+
+    templates = request.app.state.templates
+    entries = _fetch_queue_rows()
+    return templates.TemplateResponse(
+        request,
+        "partials/queue_rows_fragment.html",
+        {"entries": entries},
+    )
+
+
+@router.get("/queue/badge")
+async def queue_badge() -> Response:
+    """Return the count of active (pending + downloading) queue items.
+
+    Returns plain text count, or empty string when count is 0 so the
+    ``empty:hidden`` CSS class can hide the badge element.
+    """
+    with get_session() as session:
+        count = (
+            session.query(DownloadQueue)
+            .filter(
+                DownloadQueue.status.in_(
+                    [DownloadStatus.PENDING, DownloadStatus.DOWNLOADING]
+                )
+            )
+            .count()
+        )
+    content = str(count) if count > 0 else ""
+    return Response(content=content, media_type="text/plain")
