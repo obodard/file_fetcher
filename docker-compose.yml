@@ -46,9 +46,8 @@ services:
     restart: unless-stopped
     env_file: .env
     depends_on:
-      db:
-        condition: service_healthy
-    command: ["python", "-c", "import time; time.sleep(86400)"]
+      - db
+    command: ["python", "-m", "file_fetcher.watcher_runner"]
     volumes:
       - ${LOCAL_FILMS_PATH:-/tmp/films}:/data/films:ro
       - ${LOCAL_SERIES_PATH:-/tmp/series}:/data/series:ro

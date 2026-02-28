@@ -28,6 +28,8 @@ from file_fetcher.models.base import Base  # noqa: E402
 from file_fetcher.models.movie import Movie  # noqa: E402, F401
 from file_fetcher.models.omdb_data import OmdbData  # noqa: E402, F401
 from file_fetcher.models.remote_file import RemoteFile  # noqa: E402, F401
+from file_fetcher.models.download_queue import DownloadQueue  # noqa: E402, F401
+from file_fetcher.models.local_file import LocalFile  # noqa: E402, F401
 from file_fetcher.models.show import Show, Season, Episode  # noqa: E402, F401
 
 target_metadata = Base.metadata

@@ -17,3 +17,12 @@ class OmdbStatus(str, enum.Enum):
     ENRICHED = "enriched"
     FAILED = "failed"
     NOT_FOUND = "not_found"
+
+
+class DownloadStatus(str, enum.Enum):
+    """Download queue entry status."""
+
+    PENDING = "pending"
+    DOWNLOADING = "downloading"
+    COMPLETED = "completed"
+    FAILED = "failed"

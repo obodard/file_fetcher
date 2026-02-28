@@ -272,6 +272,27 @@ file_fetcher/
 
 ---
 
+## Local Filesystem Watcher
+
+The `watcher` Docker service monitors your local films and series directories for new media files and registers them in the catalog automatically.
+
+### Configuration
+
+Set these variables in your `.env` file:
+
+```env
+LOCAL_FILMS_PATH=/path/to/your/films
+LOCAL_SERIES_PATH=/path/to/your/series
+```
+
+The paths are mounted read-only inside the container (`/data/films` and `/data/series`).
+
+### Known Limitation — Files Added During Downtime
+
+The watcher is **event-based** (powered by [watchdog](https://pypi.org/project/watchdog/)). It only detects files that appear while the container is running. **Files added while the watcher is stopped (e.g., during a host reboot or service outage) will NOT be retroactively detected.** If you add files while the watcher is offline, register them manually via a future bulk-import command or by re-scanning the directory.
+
+---
+
 ## Troubleshooting
 
 | Problem | Solution |

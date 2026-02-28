@@ -15,36 +15,35 @@ from file_fetcher.ratings import get_ratings
 
 
 def handle_download() -> None:
-    """Run the batch download flow."""
-    # 1. Load configuration
+    """Run the download queue flow (DB-backed)."""
+    from dotenv import load_dotenv
+    load_dotenv()
+
     config = load_config()
-    
-    # Also attempt to load search config to mask those keys if they exist in env
     try:
         search_config = load_search_config()
     except Exception:
         search_config = None
-        
     setup_logging(config, search_config)
     from file_fetcher import logger
     logger.info(f"Command executed: {' '.join(sys.argv)}")
 
-    if not config.remote_paths:
-        print("Nothing to download — file list is empty.")
-        sys.exit(0)
-
-    print(f"📋  {len(config.remote_paths)} path(s) to download")
-    print(f"📂  Destination: {config.download_dir.resolve()}")
+    print(f"📂  Download directory: {config.download_dir.resolve()}")
     print()
 
-    # 2. Wait if a schedule is set
-    wait_until(config.scheduled_at)
+    from file_fetcher.db import get_session
+    from file_fetcher.services import download_service
 
-    # 3. Connect and download
     try:
-        with SFTPDownloader(config) as downloader:
-            downloader.download_all()
-            downloader.print_summary()
+        with get_session() as session:
+            with SFTPDownloader(config) as downloader:
+                summary = download_service.process_queue(session, downloader, config.download_dir)
+        print()
+        print(
+            f"📊  Summary: {summary['succeeded']} succeeded, "
+            f"{summary['failed']} failed, "
+            f"{summary['skipped']} skipped."
+        )
     except KeyboardInterrupt:
         print("\n\n⛔  Interrupted by user.")
         sys.exit(130)
@@ -172,9 +171,27 @@ def main() -> None:
     # Not-found subcommand
     subparsers.add_parser("not-found", help="Report all catalog entries OMDB could not match")
 
+    # Delete subcommand
+    delete_parser = subparsers.add_parser("delete", help="Delete a catalog entry and all its data")
+    delete_id_group = delete_parser.add_mutually_exclusive_group(required=True)
+    delete_id_group.add_argument("movie_id", nargs="?", type=int, metavar="MOVIE_ID",
+                                  help="Movie PK to delete")
+    delete_id_group.add_argument("--show", dest="show_id", type=int, metavar="SHOW_ID",
+                                  help="Show PK to delete")
+
+    # Reset subcommand
+    subparsers.add_parser("reset", help="Reset the entire catalog database")
+
     # If no arguments provided, default to download for backward compatibility
     if len(sys.argv) == 1:
         handle_download()
+        return
+
+    # Delegate `queue` sub-command to the Click group before argparse parsing
+    if len(sys.argv) >= 2 and sys.argv[1] == "queue":
+        from file_fetcher.cli.queue_cmd import queue as queue_group
+        # Pass remaining args (strip the program name)
+        queue_group(sys.argv[2:], standalone_mode=True)
         return
         
     args = parser.parse_args()
@@ -200,6 +217,15 @@ def main() -> None:
     elif args.command == "not-found":
         from file_fetcher.cli.enrich import run_not_found
         run_not_found()
+    elif args.command == "delete":
+        from file_fetcher.cli.delete import run_delete
+        run_delete(
+            movie_id=getattr(args, "movie_id", None),
+            show_id=getattr(args, "show_id", None),
+        )
+    elif args.command == "reset":
+        from file_fetcher.cli.delete import run_reset
+        run_reset()
 
 
 if __name__ == "__main__":
