@@ -48,10 +48,12 @@ def create_app() -> FastAPI:
     from file_fetcher.web.routes.catalog import router as catalog_router
     from file_fetcher.web.routes.api import router as api_router
     from file_fetcher.web.routes.queue import router as queue_router
+    from file_fetcher.web.routes.settings import router as settings_router
 
     app.include_router(catalog_router)
     app.include_router(api_router)
     app.include_router(queue_router)
+    app.include_router(settings_router)
 
     # Custom 404 handler — renders a template instead of a bare JSON response
     @app.exception_handler(404)

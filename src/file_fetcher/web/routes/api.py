@@ -12,7 +12,8 @@ from file_fetcher.db import get_session
 from file_fetcher.models.download_queue import DownloadQueue
 from file_fetcher.models.enums import DownloadStatus
 from file_fetcher.models.omdb_data import OmdbData
-from file_fetcher.services.catalog import get_by_id, search_catalog
+from file_fetcher.services.catalog import delete_catalog_entry, full_reset, get_by_id, search_catalog, set_override
+from file_fetcher.services.enrichment import enrich_one
 from file_fetcher.services.queue_service import AlreadyQueuedError, enqueue_catalog_entry, remove_from_queue, retry_entry
 from file_fetcher.web.utils import make_toast
 
@@ -390,3 +391,127 @@ async def queue_badge() -> Response:
         )
     content = str(count) if count > 0 else ""
     return Response(content=content, media_type="text/plain")
+
+
+# ── Story 10.1 — settings toggle ─────────────────────────────────────────────
+
+
+@router.patch("/settings/sftp_scan_enabled", response_class=HTMLResponse)
+async def toggle_sftp_scan(value: str = Form(...)) -> HTMLResponse:
+    """Immediately save the ``sftp_scan_enabled`` setting.
+
+    Accepts ``value`` as a form field (``"true"`` / ``"false"`` or
+    the string representation of a checkbox, e.g. ``"on"``).
+    Returns a toast OOB fragment.
+    """
+    from file_fetcher.services import settings_service  # noqa: PLC0415
+
+    enabled = value.lower() in ("true", "on", "1", "yes")
+    with get_session() as session:
+        settings_service.set(session, "sftp_scan_enabled", "true" if enabled else "false")
+
+    label = "Scan enabled" if enabled else "Scan disabled"
+    return HTMLResponse(content=make_toast(label, "success"))
+
+
+# ── Story 10.2 — delete entry & full reset ────────────────────────────────────
+
+
+@router.delete("/catalog/{catalog_id}", response_class=HTMLResponse)
+async def catalog_delete(catalog_id: int) -> HTMLResponse:
+    """Delete a catalog entry (movie or show) and all its child rows.
+
+    Returns an HTMX ``HX-Redirect`` header pointing to the catalog root.
+    """
+    with get_session() as session:
+        found = delete_catalog_entry(session, catalog_id)
+
+    if not found:
+        return HTMLResponse(
+            content=make_toast("Entry not found.", "error"),
+            status_code=404,
+        )
+
+    return Response(  # type: ignore[return-value]
+        status_code=200,
+        headers={"HX-Redirect": "/?toast=Entry+deleted"},
+    )
+
+
+@router.post("/catalog/reset", response_class=HTMLResponse)
+async def catalog_reset() -> HTMLResponse:
+    """Truncate all catalog tables (full reset).
+
+    Returns an HTMX ``HX-Redirect`` header pointing back to settings.
+    """
+    with get_session() as session:
+        full_reset(session)
+
+    return Response(  # type: ignore[return-value]
+        status_code=200,
+        headers={"HX-Redirect": "/settings?toast=Database+reset+complete"},
+    )
+
+
+# ── Story 10.3 — title override & re-enrichment ───────────────────────────────
+
+
+@router.patch("/catalog/{catalog_id}/override", response_class=HTMLResponse)
+async def catalog_set_override(
+    request: Request,
+    catalog_id: int,
+    override_title: str = Form(""),
+    omdb_id: str = Form(""),
+) -> HTMLResponse:
+    """Save title override and optional OMDB ID for a catalog entry.
+
+    Returns the updated ``override_section.html`` partial + a toast OOB fragment.
+    """
+    templates = request.app.state.templates
+
+    with get_session() as session:
+        found = set_override(session, catalog_id, override_title, omdb_id or None)
+
+    if not found:
+        return HTMLResponse(
+            content=make_toast("Entry not found.", "error"),
+            status_code=404,
+        )
+
+    with get_session() as session:
+        entry = get_by_id(session, catalog_id)
+
+    partial_html = templates.get_template("partials/override_section.html").render(
+        {"entry": entry, "request": request, "edit_mode": False}
+    )
+    return HTMLResponse(content=partial_html + make_toast("Override saved.", "success"))
+
+
+@router.post("/catalog/{catalog_id}/enrich", response_class=HTMLResponse)
+async def catalog_enrich(request: Request, catalog_id: int) -> HTMLResponse:
+    """Trigger immediate OMDB re-enrichment for a single catalog entry.
+
+    Returns the updated ``override_section.html`` partial + a toast OOB fragment.
+    Respects ``title_override``, ``year_override``, and ``override_omdb_id``.
+    """
+    templates = request.app.state.templates
+
+    with get_session() as session:
+        success, message = enrich_one(session, catalog_id)
+
+    toast_type = "success" if success else "error"
+    toast_msg = f"Enriched: {message}" if success else f"Enrichment failed: {message}"
+
+    with get_session() as session:
+        entry = get_by_id(session, catalog_id)
+
+    if entry is None:
+        return HTMLResponse(
+            content=make_toast("Entry not found.", "error"),
+            status_code=404,
+        )
+
+    partial_html = templates.get_template("partials/override_section.html").render(
+        {"entry": entry, "request": request, "edit_mode": False}
+    )
+    return HTMLResponse(content=partial_html + make_toast(toast_msg, toast_type))

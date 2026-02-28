@@ -5,6 +5,24 @@ from __future__ import annotations
 from typing import Literal
 
 
+def validate_cron(expr: str) -> bool:
+    """Return True if *expr* is a valid 5-field cron expression or empty.
+
+    A valid cron expression consists of exactly 5 whitespace-separated fields.
+    Empty string (no schedule) is also accepted.
+
+    Args:
+        expr: Cron expression string to validate.
+
+    Returns:
+        ``True`` if valid, ``False`` otherwise.
+    """
+    if not expr or not expr.strip():
+        return True
+    parts = expr.strip().split()
+    return len(parts) == 5
+
+
 def make_toast(
     message: str,
     type: Literal["success", "error", "info"] = "info",

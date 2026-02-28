@@ -119,13 +119,24 @@ class TestSeedDefaults:
 
     def test_seed_defaults_keys_match_expected(self, db_session: Session) -> None:
         expected_keys = {
+            # SFTP
+            "sftp_host",
+            "sftp_port",
+            "sftp_user",
+            "sftp_password",
+            "sftp_remote_path",
             "sftp_scan_enabled",
             "sftp_scan_cron",
+            # OMDB
+            "omdb_api_key",
             "omdb_enrich_cron",
             "omdb_batch_limit",
             "omdb_daily_quota",
+            # Downloads
             "download_dir",
             "scheduler_poll_interval",
+            # Web
+            "web_poll_interval_seconds",
         }
         assert set(settings_service.DEFAULTS.keys()) == expected_keys
 

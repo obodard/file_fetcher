@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+
+{% block title %}Settings — file_fetcher{% endblock %}
+
+{% block content %}
+
+<h1 class="text-2xl font-bold mb-6">Settings</h1>
+
+{# Toast from redirect-after-POST #}
+{% if toast %}
+<div hx-swap-oob="beforeend:#toast-container">
+  <div role="alert" class="alert alert-success shadow-lg flex items-center gap-2 pr-2" data-toast>
+    <span class="flex-1 text-sm">{{ toast | e }}</span>
+    <button aria-label="Dismiss" class="btn btn-ghost btn-xs" onclick="this.closest('[role=alert]').remove()">✕</button>
+  </div>
+</div>
+{% endif %}
+
+{% set errors = errors | default({}) %}
+
+<form method="POST" action="/settings" id="settings-form">
+
+  {# ── SFTP Section ─────────────────────────────────────────────────────── #}
+  <div class="divider text-sm font-semibold uppercase tracking-widest">SFTP</div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+    <div class="form-control">
+      <label class="label" for="sftp_host"><span class="label-text">Host</span></label>
+      <input id="sftp_host" name="sftp_host" type="text" class="input input-bordered"
+             value="{{ settings.get('sftp_host', '') | e }}" placeholder="192.168.1.1">
+    </div>
+
+    <div class="form-control">
+      <label class="label" for="sftp_port"><span class="label-text">Port</span></label>
+      <input id="sftp_port" name="sftp_port" type="text" class="input input-bordered"
+             value="{{ settings.get('sftp_port', '22') | e }}" placeholder="22">
+    </div>
+
+    <div class="form-control">
+      <label class="label" for="sftp_user"><span class="label-text">Username</span></label>
+      <input id="sftp_user" name="sftp_user" type="text" class="input input-bordered"
+             value="{{ settings.get('sftp_user', '') | e }}" autocomplete="off">
+    </div>
+
+    <div class="form-control">
+      <label class="label" for="sftp_password"><span class="label-text">Password</span></label>
+      <div class="flex gap-2">
+        <input id="sftp_password" name="sftp_password" type="password"
+               class="input input-bordered flex-1"
+               value="{{ settings.get('sftp_password', '') | e }}"
+               autocomplete="new-password">
+        <button type="button" class="btn btn-ghost btn-sm"
+                onclick="const i=document.getElementById('sftp_password');i.type=i.type==='password'?'text':'password'">
+          Reveal
+        </button>
+      </div>
+    </div>
+
+    <div class="form-control md:col-span-2">
+      <label class="label" for="sftp_remote_path"><span class="label-text">Remote Path</span></label>
+      <input id="sftp_remote_path" name="sftp_remote_path" type="text" class="input input-bordered"
+             value="{{ settings.get('sftp_remote_path', '/') | e }}" placeholder="/">
+    </div>
+
+    <div class="form-control">
+      <label class="label cursor-pointer justify-start gap-4" for="sftp_scan_enabled_toggle">
+        <span class="label-text">Scan Enabled</span>
+        <input id="sftp_scan_enabled_toggle"
+               type="checkbox"
+               class="toggle toggle-primary"
+               {% if settings.get('sftp_scan_enabled', 'true') == 'true' %}checked{% endif %}
+               hx-patch="/api/settings/sftp_scan_enabled"
+               hx-vals="js:{value: event.target.checked ? 'true' : 'false'}"
+               hx-trigger="change">
+      </label>
+    </div>
+
+    <div class="form-control">
+      <label class="label" for="sftp_scan_cron">
+        <span class="label-text">Scan Schedule (cron)</span>
+      </label>
+      <input id="sftp_scan_cron" name="sftp_scan_cron" type="text" class="input input-bordered
+             {% if errors.get('sftp_scan_cron') %}input-error{% endif %}"
+             value="{{ settings.get('sftp_scan_cron', '') | e }}" placeholder="0 3 * * *">
+      {% if errors.get('sftp_scan_cron') %}
+        <p class="text-error text-xs mt-1">{{ errors['sftp_scan_cron'] | e }}</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  {# ── OMDB Section ──────────────────────────────────────────────────────── #}
+  <div class="divider text-sm font-semibold uppercase tracking-widest">OMDB</div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+    <div class="form-control md:col-span-2">
+      <label class="label" for="omdb_api_key"><span class="label-text">API Key</span></label>
+      <div class="flex gap-2">
+        <input id="omdb_api_key" name="omdb_api_key" type="password"
+               class="input input-bordered flex-1"
+               value="{{ settings.get('omdb_api_key', '') | e }}"
+               autocomplete="new-password">
+        <button type="button" class="btn btn-ghost btn-sm"
+                onclick="const i=document.getElementById('omdb_api_key');i.type=i.type==='password'?'text':'password'">
+          Reveal
+        </button>
+      </div>
+    </div>
+
+    <div class="form-control">
+      <label class="label" for="omdb_batch_limit"><span class="label-text">Batch Limit</span></label>
+      <input id="omdb_batch_limit" name="omdb_batch_limit" type="text" class="input input-bordered"
+             value="{{ settings.get('omdb_batch_limit', '50') | e }}">
+    </div>
+
+    <div class="form-control">
+      <label class="label" for="omdb_daily_quota"><span class="label-text">Daily Quota</span></label>
+      <input id="omdb_daily_quota" name="omdb_daily_quota" type="text" class="input input-bordered"
+             value="{{ settings.get('omdb_daily_quota', '1000') | e }}">
+    </div>
+
+    <div class="form-control md:col-span-2">
+      <label class="label" for="omdb_enrich_cron">
+        <span class="label-text">Enrichment Schedule (cron)</span>
+      </label>
+      <input id="omdb_enrich_cron" name="omdb_enrich_cron" type="text" class="input input-bordered
+             {% if errors.get('omdb_enrich_cron') %}input-error{% endif %}"
+             value="{{ settings.get('omdb_enrich_cron', '') | e }}" placeholder="0 4 * * *">
+      {% if errors.get('omdb_enrich_cron') %}
+        <p class="text-error text-xs mt-1">{{ errors['omdb_enrich_cron'] | e }}</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  {# ── Downloads Section ─────────────────────────────────────────────────── #}
+  <div class="divider text-sm font-semibold uppercase tracking-widest">Downloads</div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+    <div class="form-control md:col-span-2">
+      <label class="label" for="download_dir"><span class="label-text">Download Directory</span></label>
+      <input id="download_dir" name="download_dir" type="text" class="input input-bordered"
+             value="{{ settings.get('download_dir', '/downloads') | e }}">
+    </div>
+
+    <div class="form-control">
+      <label class="label" for="scheduler_poll_interval">
+        <span class="label-text">Scheduler Poll Interval (seconds)</span>
+      </label>
+      <input id="scheduler_poll_interval" name="scheduler_poll_interval" type="text"
+             class="input input-bordered"
+             value="{{ settings.get('scheduler_poll_interval', '60') | e }}">
+    </div>
+
+  </div>
+
+  {# ── Web Section ───────────────────────────────────────────────────────── #}
+  <div class="divider text-sm font-semibold uppercase tracking-widest">Web</div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+
+    <div class="form-control">
+      <label class="label" for="web_poll_interval_seconds">
+        <span class="label-text">Queue Badge Poll Interval (seconds)</span>
+      </label>
+      <input id="web_poll_interval_seconds" name="web_poll_interval_seconds" type="text"
+             class="input input-bordered"
+             value="{{ settings.get('web_poll_interval_seconds', '5') | e }}">
+    </div>
+
+  </div>
+
+  <div class="mt-6">
+    <button type="submit" class="btn btn-primary">Save Settings</button>
+  </div>
+
+</form>
+
+{# ── Not Found Section ─────────────────────────────────────────────────────── #}
+{% if not_found_entries %}
+<div class="divider text-sm font-semibold uppercase tracking-widest mt-8">Not Found</div>
+<p class="text-sm opacity-70 mb-4">
+  These catalogue entries could not be matched by OMDB. Click a title to set an override and re-enrich.
+</p>
+<div class="overflow-x-auto">
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Title</th>
+        <th>Year</th>
+        <th>Remote File</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in not_found_entries %}
+      <tr>
+        <td class="opacity-60">{{ entry.media_kind | e }}</td>
+        <td>{{ entry.title | e }}</td>
+        <td>{{ entry.year or "—" }}</td>
+        <td class="font-mono text-xs break-all">
+          {{ (entry.remote_paths[0] | e) if entry.remote_paths else "—" }}
+        </td>
+        <td>
+          <a href="/title/{{ entry.id }}?edit=1" class="btn btn-xs btn-outline">Override</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{# ── Danger Zone ──────────────────────────────────────────────────────────── #}
+<div class="divider text-sm font-semibold uppercase tracking-widest mt-8">Danger Zone</div>
+
+<div class="card border border-error mt-4">
+  <div class="card-body">
+    <h2 class="card-title text-error">Full Database Reset</h2>
+    <p class="text-sm opacity-70">
+      This will permanently erase all catalogue data — movies, shows, enrichment data,
+      local file records and the download queue. <strong>This cannot be undone.</strong>
+    </p>
+    <div class="card-actions mt-2">
+      <button class="btn btn-error btn-outline"
+              onclick="document.getElementById('reset-modal').showModal()">
+        Full Reset…
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ── Reset confirm modal ──────────────────────────────────────────────────── #}
+<dialog id="reset-modal" class="modal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg text-error">Confirm Full Reset</h3>
+    <p class="py-4 text-sm">
+      Type <strong>RESET</strong> below to confirm. All catalogue data will be permanently deleted.
+    </p>
+    <input id="reset-confirm-input"
+           type="text"
+           class="input input-bordered input-error w-full mb-4"
+           placeholder="Type RESET to confirm"
+           oninput="document.getElementById('reset-confirm-btn').disabled = this.value !== 'RESET'">
+    <div class="modal-action">
+      <form method="dialog">
+        <button class="btn btn-ghost">Cancel</button>
+      </form>
+      <button id="reset-confirm-btn"
+              class="btn btn-error"
+              disabled
+              hx-post="/api/catalog/reset"
+              hx-target="body"
+              onclick="document.getElementById('reset-modal').close()">
+        Confirm Reset
+      </button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+{% endblock %}

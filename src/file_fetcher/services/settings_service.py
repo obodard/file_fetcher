@@ -21,6 +21,27 @@ log = logging.getLogger(__name__)
 # Default settings seeded at every app startup.
 DEFAULTS: dict[str, tuple[str, str]] = {
     # key: (default_value, description)
+    # SFTP connection
+    "sftp_host": (
+        os.environ.get("SFTP_HOST", ""),
+        "SFTP server hostname.",
+    ),
+    "sftp_port": (
+        os.environ.get("SFTP_PORT", "22"),
+        "SFTP server port.",
+    ),
+    "sftp_user": (
+        os.environ.get("SFTP_USER", ""),
+        "SFTP username.",
+    ),
+    "sftp_password": (
+        os.environ.get("SFTP_PASSWORD", ""),
+        "SFTP password (sensitive).",
+    ),
+    "sftp_remote_path": (
+        os.environ.get("SFTP_REMOTE_PATH", "/"),
+        "Remote path to scan for media files.",
+    ),
     "sftp_scan_enabled": (
         "true",
         "Enable or disable scheduled SFTP scanning (true/false).",
@@ -28,6 +49,11 @@ DEFAULTS: dict[str, tuple[str, str]] = {
     "sftp_scan_cron": (
         "0 3 * * *",
         "Cron expression for SFTP scan schedule (default: 03:00 daily).",
+    ),
+    # OMDB enrichment
+    "omdb_api_key": (
+        os.environ.get("OMDB_API_KEY", ""),
+        "OMDB API key (sensitive).",
     ),
     "omdb_enrich_cron": (
         "0 4 * * *",
@@ -41,6 +67,7 @@ DEFAULTS: dict[str, tuple[str, str]] = {
         "1000",
         "Maximum OMDB API calls allowed per day.",
     ),
+    # Downloads
     "download_dir": (
         os.environ.get("DOWNLOAD_DIR", "/downloads"),
         "Destination directory for downloaded files.",
@@ -48,6 +75,11 @@ DEFAULTS: dict[str, tuple[str, str]] = {
     "scheduler_poll_interval": (
         "60",
         "Scheduler internal polling interval in seconds.",
+    ),
+    # Web UI
+    "web_poll_interval_seconds": (
+        "5",
+        "Web UI polling interval in seconds for the queue badge.",
     ),
 }
 
@@ -103,6 +135,28 @@ def get_all(session: Session) -> list[Setting]:
         List of :class:`Setting` instances.
     """
     return session.query(Setting).order_by(Setting.key).all()
+
+
+def update_batch(session: Session, data: dict[str, str]) -> int:
+    """Upsert multiple settings from *data* dict and return the count saved.
+
+    Keys with empty-string values are stored as empty strings (not deleted),
+    so that form resets are preserved.
+
+    Args:
+        session: Active SQLAlchemy session.
+        data:    Mapping of key → value to save.
+
+    Returns:
+        Number of settings upserted.
+    """
+    count = 0
+    for key, value in data.items():
+        if key:
+            set(session, key, value)
+            count += 1
+    session.flush()
+    return count
 
 
 def seed_defaults(session: Session) -> None:

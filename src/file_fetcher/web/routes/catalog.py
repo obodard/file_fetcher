@@ -57,10 +57,15 @@ async def catalog_grid(
 
 
 @router.get("/title/{catalog_id}", response_class=HTMLResponse)
-async def title_detail(request: Request, catalog_id: int) -> HTMLResponse:
+async def title_detail(
+    request: Request,
+    catalog_id: int,
+    edit: int = Query(default=0),
+) -> HTMLResponse:
     """Render the full detail page for a single catalog entry.
 
     Returns 404 (rendered template) if the entry does not exist.
+    Query param ``?edit=1`` pre-expands the override section.
     """
     templates = request.app.state.templates
 
@@ -76,5 +81,6 @@ async def title_detail(request: Request, catalog_id: int) -> HTMLResponse:
         {
             "entry": entry,
             "title": f"{entry.title} — file_fetcher",
+            "edit_mode": edit == 1,
         },
     )

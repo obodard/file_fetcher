@@ -48,6 +48,12 @@
     <div id="action-buttons">
       {% include "partials/action_buttons.html" %}
     </div>
+
+    <!-- Delete button -->
+    <button class="btn btn-error btn-outline btn-sm mt-2 w-full"
+            onclick="document.getElementById('delete-modal').showModal()">
+      Delete Entry
+    </button>
   </div>
 
   <!-- Right: Metadata -->
@@ -165,7 +171,33 @@
     </div>
     {% endif %}
 
+    <!-- Override & Re-enrich section (Story 10.3) -->
+    {% include "partials/override_section.html" %}
+
   </div>
 </div>
+
+<!-- Delete Confirm Modal (Story 10.2) -->
+<dialog id="delete-modal" class="modal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg">Delete Entry</h3>
+    <p class="py-4 text-sm">
+      Delete <strong>{{ entry.title | e }}</strong> from the catalogue?
+      <br>
+      <span class="opacity-60">This will not delete the local file.</span>
+    </p>
+    <div class="modal-action">
+      <form method="dialog">
+        <button class="btn btn-ghost">Cancel</button>
+      </form>
+      <button class="btn btn-error"
+              hx-delete="/api/catalog/{{ entry.id }}"
+              onclick="document.getElementById('delete-modal').close()">
+        Delete
+      </button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 {% endblock %}

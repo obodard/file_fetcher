@@ -5,6 +5,8 @@ Covers:
   - Story 2.5: get_not_found extended to include shows
   - Story 3.3: delete_entry, full_reset
   - Story 5.1: search_catalog, get_title_detail
+  - Story 10.2: delete_catalog_entry
+  - Story 10.3: set_override
 """
 
 from __future__ import annotations
@@ -165,9 +167,67 @@ def full_reset(session: Session) -> None:
     log.info("Full reset complete.")
 
 
-# ---------------------------------------------------------------------------
-# Story 5.1 — search & detail helpers
-# ---------------------------------------------------------------------------
+def delete_catalog_entry(session: Session, catalog_id: int) -> bool:
+    """Delete a catalog entry (movie or show) by its numeric ID.
+
+    Tries movie table first, then show table.  Delegates to
+    :func:`delete_entry` for the actual cascading deletion.
+
+    Args:
+        session:    Active SQLAlchemy session.
+        catalog_id: PK to look up in ``movies`` then ``shows``.
+
+    Returns:
+        ``True`` if the entry was found and deleted, ``False`` otherwise.
+    """
+    movie = session.get(Movie, catalog_id)
+    if movie is not None:
+        delete_entry(session, movie_id=catalog_id)
+        return True
+    show = session.get(Show, catalog_id)
+    if show is not None:
+        delete_entry(session, show_id=catalog_id)
+        return True
+    return False
+
+
+def set_override(
+    session: Session,
+    catalog_id: int,
+    override_title: str,
+    override_omdb_id: str | None,
+) -> bool:
+    """Set title override and optional OMDB ID override for a catalog entry.
+
+    Resets ``omdb_status`` to ``PENDING`` so the entry is picked up during the
+    next enrichment run.
+
+    Args:
+        session:          Active SQLAlchemy session.
+        catalog_id:       PK of the movie or show.
+        override_title:   New search title (empty string clears override).
+        override_omdb_id: Direct IMDB ID (e.g. ``"tt1234567"``), or ``None``.
+
+    Returns:
+        ``True`` if the entry was found and updated, ``False`` otherwise.
+    """
+    movie = session.get(Movie, catalog_id)
+    if movie is not None:
+        movie.title_override = override_title or None
+        movie.override_omdb_id = override_omdb_id or None
+        movie.omdb_status = OmdbStatus.PENDING
+        session.flush()
+        return True
+    show = session.get(Show, catalog_id)
+    if show is not None:
+        show.title_override = override_title or None
+        show.override_omdb_id = override_omdb_id or None
+        show.omdb_status = OmdbStatus.PENDING
+        session.flush()
+        return True
+    return False
+
+
 
 def _compute_availability(
     remote_files: list[RemoteFile],
@@ -466,6 +526,8 @@ def get_title_detail(
             total_seasons=omdb.total_seasons if omdb else None,
             imdb_votes=omdb.imdb_votes if omdb else None,
             box_office=omdb.box_office if omdb else None,
+            override_title=entry.title_override,
+            override_omdb_id=entry.override_omdb_id,
         )
 
     else:  # series
@@ -513,5 +575,7 @@ def get_title_detail(
             total_seasons=omdb.total_seasons if omdb else None,
             imdb_votes=omdb.imdb_votes if omdb else None,
             box_office=omdb.box_office if omdb else None,
+            override_title=entry.title_override,
+            override_omdb_id=entry.override_omdb_id,
         )
 

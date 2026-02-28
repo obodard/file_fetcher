@@ -66,3 +66,7 @@ class TitleDetail(BaseModel):
     total_seasons: Optional[int] = None
     imdb_votes: Optional[str] = None
     box_office: Optional[str] = None
+
+    # Override fields (Story 10.3)
+    override_title: Optional[str] = None
+    override_omdb_id: Optional[str] = None

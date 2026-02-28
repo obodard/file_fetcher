@@ -1,0 +1,65 @@
+{#
+  Override & Re-enrich collapsible section.
+
+  Context variables:
+    entry      — TitleDetail (has .id, .title, .override_title, .override_omdb_id)
+    edit_mode  — bool: pre-expand the collapse (True when ?edit=1)
+#}
+<div id="override-section-{{ entry.id }}"
+     class="collapse collapse-arrow border border-base-300 rounded-box mt-6">
+  <input type="checkbox" class="peer"
+         {% if edit_mode %}checked{% endif %} />
+  <div class="collapse-title font-medium text-sm">
+    Override &amp; Re-enrich
+  </div>
+  <div class="collapse-content">
+    <p class="text-xs opacity-60 mb-3">
+      Set a custom search title or a direct IMDB ID, then click
+      <strong>Save Override</strong>.  Use <strong>Re-enrich Now</strong> to
+      immediately fetch updated metadata from OMDB.
+    </p>
+
+    <form hx-patch="/api/catalog/{{ entry.id }}/override"
+          hx-target="#override-section-{{ entry.id }}"
+          hx-swap="outerHTML"
+          class="flex flex-col gap-3">
+
+      <div class="form-control">
+        <label class="label" for="override-title-{{ entry.id }}">
+          <span class="label-text text-xs">Search Title</span>
+        </label>
+        <input id="override-title-{{ entry.id }}"
+               name="override_title"
+               type="text"
+               class="input input-bordered input-sm"
+               value="{{ (entry.override_title or entry.title) | e }}"
+               placeholder="{{ entry.title | e }}">
+      </div>
+
+      <div class="form-control">
+        <label class="label" for="override-omdb-{{ entry.id }}">
+          <span class="label-text text-xs">OMDb ID (optional, e.g. tt1234567)</span>
+        </label>
+        <input id="override-omdb-{{ entry.id }}"
+               name="omdb_id"
+               type="text"
+               class="input input-bordered input-sm"
+               value="{{ (entry.override_omdb_id or '') | e }}"
+               placeholder="tt1234567">
+      </div>
+
+      <div class="flex gap-2 mt-1">
+        <button type="submit" class="btn btn-sm btn-primary">Save Override</button>
+
+        <button type="button"
+                class="btn btn-sm btn-outline"
+                hx-post="/api/catalog/{{ entry.id }}/enrich"
+                hx-target="#override-section-{{ entry.id }}"
+                hx-swap="outerHTML">
+          Re-enrich Now
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>

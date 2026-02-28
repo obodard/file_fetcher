@@ -33,6 +33,7 @@ class Movie(Base):
     )
     title_override: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     year_override: Mapped[Optional[int]] = mapped_column(nullable=True)
+    override_omdb_id: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     omdb_status: Mapped[OmdbStatus] = mapped_column(
         default=OmdbStatus.PENDING,
         server_default=OmdbStatus.PENDING.value,

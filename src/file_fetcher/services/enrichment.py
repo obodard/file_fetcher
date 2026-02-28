@@ -59,6 +59,24 @@ def _fetch_omdb_raw(title: str, year: Optional[int], api_key: str) -> Optional[d
         return None
 
 
+def _fetch_omdb_by_id(imdb_id: str, api_key: str) -> Optional[dict]:
+    """Call OMDB by direct IMDB ID (e.g. ``"tt1234567"``); None on error.
+
+    Does NOT raise — errors are logged as WARNING and return None.
+    """
+    if not api_key or api_key in ("your_omdb_api_key", ""):
+        log.warning("OMDB_API_KEY is not set; skipping direct-ID enrichment for '%s'.", imdb_id)
+        return None
+    params: dict = {"i": imdb_id, "apikey": api_key}
+    try:
+        resp = requests.get(_OMDB_URL, params=params, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.RequestException as exc:
+        log.warning("OMDB network error for IMDB ID '%s': %s", imdb_id, exc)
+        return None
+
+
 def _extract_rating(ratings_list: list[dict], source: str) -> Optional[str]:
     """Extract a rating value by source name from OMDB Ratings list."""
     for entry in ratings_list:
@@ -162,7 +180,10 @@ def enrich_single(session: Session, movie_id: int, force: bool = False) -> Optio
     year = movie.year_override or movie.year
 
     api_key = _get_api_key()
-    data = _fetch_omdb_raw(title, year, api_key)
+    if movie.override_omdb_id:
+        data = _fetch_omdb_by_id(movie.override_omdb_id, api_key)
+    else:
+        data = _fetch_omdb_raw(title, year, api_key)
 
     if data is None:
         # Network / HTTP error
@@ -210,7 +231,10 @@ def enrich_single_show(session: Session, show_id: int, force: bool = False) -> O
     year = show.year_override or show.year
 
     api_key = _get_api_key()
-    data = _fetch_omdb_raw(title, year, api_key)
+    if show.override_omdb_id:
+        data = _fetch_omdb_by_id(show.override_omdb_id, api_key)
+    else:
+        data = _fetch_omdb_raw(title, year, api_key)
 
     if data is None:
         show.omdb_status = OmdbStatus.FAILED
@@ -337,3 +361,37 @@ def run_enrichment_batch(
                 stats["shows_failed"] += 1
 
     return stats
+
+
+def enrich_one(session: Session, catalog_id: int) -> tuple[bool, str]:
+    """Enrich a catalog entry (movie or show) by numeric ID with ``force=True``.
+
+    Tries the movie table first, then the show table.  Respects
+    ``title_override``, ``year_override``, and ``override_omdb_id`` if set.
+
+    Args:
+        session:    Active SQLAlchemy session.
+        catalog_id: PK to look up in ``movies`` or ``shows``.
+
+    Returns:
+        ``(True, "Title (year)")`` on success, or
+        ``(False, error_message)`` on failure / not found.
+    """
+    from file_fetcher.models.movie import Movie  # avoid circular at module level  # noqa: PLC0415
+    from file_fetcher.models.show import Show  # noqa: PLC0415
+
+    movie = session.get(Movie, catalog_id)
+    if movie is not None:
+        result = enrich_single(session, movie.id, force=True)
+        if result:
+            return True, f"{movie.title} ({movie.year or '?'})"
+        return False, movie.omdb_status.value
+
+    show = session.get(Show, catalog_id)
+    if show is not None:
+        result = enrich_single_show(session, show.id, force=True)
+        if result:
+            return True, f"{show.title} ({show.year or '?'})"
+        return False, show.omdb_status.value
+
+    return False, "Entry not found"
