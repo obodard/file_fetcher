@@ -16,6 +16,10 @@ from file_fetcher.models.remote_file import RemoteFile
 log = logging.getLogger(__name__)
 
 
+class AlreadyQueuedError(ValueError):
+    """Raised when a catalog entry already has a non-failed queue entry."""
+
+
 # ── Story 4.1 ─────────────────────────────────────────────────────────────────
 
 
@@ -147,3 +151,77 @@ def get_queue_summary(session: Session) -> dict[str, int]:
         summary[key] = count
     summary["total"] = sum(summary.values())
     return summary
+
+
+# ── Story 8.2 — web queue actions ─────────────────────────────────────────────
+
+
+def enqueue_catalog_entry(
+    session: Session,
+    catalog_id: int,
+    priority: int = 0,
+) -> DownloadQueue:
+    """Add a catalog entry (movie OR show) to the download queue by its id.
+
+    Looks up ``RemoteFile`` rows linked to ``catalog_id`` (tries movie_id first,
+    then show_id).  Raises :class:`AlreadyQueuedError` if any remote file for
+    this catalog entry already has a pending or downloading queue entry.
+    Raises ``ValueError`` if no ``RemoteFile`` exists for the given id.
+
+    Args:
+        session:    Active SQLAlchemy session.
+        catalog_id: Primary key of the ``Movie`` or ``Show``.
+        priority:   Queue priority (default 0; use 999 for "download now").
+
+    Returns:
+        The newly created :class:`DownloadQueue` entry.
+
+    Raises:
+        AlreadyQueuedError: Entry already in queue with non-failed status.
+        ValueError:         No RemoteFile found for the given catalog_id.
+    """
+    # Find remote files for this catalog entry
+    remote_files = (
+        session.query(RemoteFile)
+        .filter(
+            (RemoteFile.movie_id == catalog_id) | (RemoteFile.show_id == catalog_id)
+        )
+        .all()
+    )
+    if not remote_files:
+        raise ValueError(f"No RemoteFile found for catalog_id={catalog_id}.")
+
+    rf_ids = [rf.id for rf in remote_files]
+
+    # Check for existing non-failed queue entries
+    existing = (
+        session.query(DownloadQueue)
+        .filter(
+            DownloadQueue.remote_file_id.in_(rf_ids),
+            DownloadQueue.status.in_(
+                [DownloadStatus.PENDING, DownloadStatus.DOWNLOADING, DownloadStatus.COMPLETED]
+            ),
+        )
+        .first()
+    )
+    if existing is not None:
+        raise AlreadyQueuedError(
+            f"catalog_id={catalog_id} is already queued (queue_id={existing.id})."
+        )
+
+    # Enqueue the first available remote file
+    remote_file = remote_files[0]
+    entry = DownloadQueue(
+        remote_file_id=remote_file.id,
+        priority=priority,
+        status=DownloadStatus.PENDING,
+    )
+    session.add(entry)
+    session.commit()
+    log.info(
+        "Enqueued catalog_id=%s via remote_file_id=%s (priority=%s)",
+        catalog_id,
+        remote_file.id,
+        priority,
+    )
+    return entry

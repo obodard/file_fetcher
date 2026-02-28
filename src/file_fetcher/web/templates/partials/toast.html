@@ -1,0 +1,12 @@
+{#
+  Single toast item template.
+  Variables expected:
+    - message  : str
+    - type     : "success" | "error" | "info"
+#}
+<div role="alert" class="alert alert-{{ type }} shadow-lg flex items-center gap-2 pr-2"
+  {% if type == "error" %}data-toast-error="true"{% else %}data-toast{% endif %}>
+  <span class="flex-1 text-sm">{{ message }}</span>
+  <button aria-label="Dismiss" class="btn btn-ghost btn-xs"
+    onclick="this.closest('[role=alert]').remove()">✕</button>
+</div>

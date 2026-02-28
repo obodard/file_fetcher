@@ -394,6 +394,18 @@ def search_catalog(
     return results[:limit]
 
 
+def get_by_id(session: Session, catalog_id: int) -> Optional[TitleDetail]:
+    """Return full detail for a catalog entry by numeric ID.
+
+    Tries ``Movie`` table first, then ``Show``.  Returns ``None`` if no entry
+    is found in either table.
+    """
+    detail = get_title_detail(session, catalog_id, "film")
+    if detail is not None:
+        return detail
+    return get_title_detail(session, catalog_id, "series")
+
+
 def get_title_detail(
     session: Session,
     title_id: int,

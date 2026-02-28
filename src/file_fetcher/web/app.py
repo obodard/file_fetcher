@@ -1,7 +1,8 @@
 """FastAPI application factory for the file_fetcher web layer."""
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -29,6 +30,16 @@ def create_app() -> FastAPI:
 
     app.include_router(catalog_router)
     app.include_router(api_router)
+
+    # Custom 404 handler — renders a template instead of a bare JSON response
+    @app.exception_handler(404)
+    async def not_found_handler(request: Request, exc: Exception) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "catalog/title_detail_404.html",
+            {"title": "Not Found — file_fetcher"},
+            status_code=404,
+        )
 
     return app
 

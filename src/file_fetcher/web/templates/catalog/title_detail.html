@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}{{ entry.title | e }} — file_fetcher{% endblock %}
+
+{% block content %}
+
+{# SEO meta — injected via head block override if base supports it; #}
+{# stored in <head> at render time by Jinja2 since we call TemplateResponse. #}
+
+{%- set is_local = entry.availability in ("in_collection", "both") -%}
+{%- set is_queued = entry.availability == "remote_only_downloading" -%}
+
+<meta name="description" content="{{ (entry.plot or "")[:160] | e }}">
+
+<!-- Breadcrumb -->
+<nav class="text-sm breadcrumbs mb-4" aria-label="Breadcrumb">
+  <ul>
+    <li><a href="/" class="link link-hover">Catalog</a></li>
+    <li>{{ entry.title | e }}</li>
+  </ul>
+</nav>
+
+<!-- Two-column layout -->
+<div class="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-6">
+
+  <!-- Left: Poster -->
+  <div class="flex flex-col gap-4">
+    <figure class="rounded-xl overflow-hidden shadow-lg">
+      <img
+        src="/api/posters/{{ entry.id }}"
+        alt="{{ entry.title | e }} poster"
+        class="w-full object-cover aspect-[2/3]"
+      />
+    </figure>
+
+    <!-- Availability badge -->
+    <div>
+      {% if is_local %}
+        <span class="badge badge-success">In Collection</span>
+      {% elif is_queued %}
+        <span class="badge badge-info">Downloading</span>
+      {% else %}
+        <span class="badge badge-ghost">Remote Only</span>
+      {% endif %}
+    </div>
+
+    <!-- Action buttons -->
+    <div id="action-buttons">
+      {% include "partials/action_buttons.html" %}
+    </div>
+  </div>
+
+  <!-- Right: Metadata -->
+  <div class="flex flex-col gap-6">
+
+    <!-- Header -->
+    <div>
+      <h1 class="text-3xl font-bold">
+        {{ entry.title | e }}
+        {% if entry.year %}
+          <span class="text-lg font-normal opacity-60">({{ entry.year }})</span>
+        {% endif %}
+      </h1>
+      {% if entry.rated %}
+        <span class="badge badge-outline mt-1">{{ entry.rated | e }}</span>
+      {% endif %}
+    </div>
+
+    <!-- Rating row -->
+    {% if entry.imdb_rating or entry.rotten_tomatoes_rating or entry.metacritic_rating %}
+    <div class="flex flex-wrap gap-4">
+      {% if entry.imdb_rating %}
+      <div class="stat bg-base-200 rounded-box p-3">
+        <div class="stat-title text-xs">IMDb</div>
+        <div class="stat-value text-lg">{{ entry.imdb_rating }}</div>
+        {% if entry.imdb_votes %}
+          <div class="stat-desc">{{ entry.imdb_votes }} votes</div>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% if entry.rotten_tomatoes_rating %}
+      <div class="stat bg-base-200 rounded-box p-3">
+        <div class="stat-title text-xs">Rotten Tomatoes</div>
+        <div class="stat-value text-lg">{{ entry.rotten_tomatoes_rating }}</div>
+      </div>
+      {% endif %}
+      {% if entry.metacritic_rating %}
+      <div class="stat bg-base-200 rounded-box p-3">
+        <div class="stat-title text-xs">Metascore</div>
+        <div class="stat-value text-lg">{{ entry.metacritic_rating }}</div>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Core details -->
+    <dl class="grid grid-cols-[7rem_1fr] gap-x-4 gap-y-2 text-sm">
+      {% if entry.genre %}
+      <dt class="font-semibold opacity-60">Genre</dt>
+      <dd>{{ entry.genre | e }}</dd>
+      {% endif %}
+      {% if entry.director %}
+      <dt class="font-semibold opacity-60">Director</dt>
+      <dd>{{ entry.director | e }}</dd>
+      {% endif %}
+      {% if entry.writer %}
+      <dt class="font-semibold opacity-60">Writer</dt>
+      <dd>{{ entry.writer | e }}</dd>
+      {% endif %}
+      {% if entry.actors %}
+      <dt class="font-semibold opacity-60">Actors</dt>
+      <dd>{{ entry.actors | e }}</dd>
+      {% endif %}
+      {% if entry.runtime %}
+      <dt class="font-semibold opacity-60">Runtime</dt>
+      <dd>{{ entry.runtime | e }}</dd>
+      {% endif %}
+      {% if entry.released %}
+      <dt class="font-semibold opacity-60">Released</dt>
+      <dd>{{ entry.released | e }}</dd>
+      {% endif %}
+      {% if entry.language %}
+      <dt class="font-semibold opacity-60">Language</dt>
+      <dd>{{ entry.language | e }}</dd>
+      {% endif %}
+      {% if entry.country %}
+      <dt class="font-semibold opacity-60">Country</dt>
+      <dd>{{ entry.country | e }}</dd>
+      {% endif %}
+      {% if entry.awards %}
+      <dt class="font-semibold opacity-60">Awards</dt>
+      <dd>{{ entry.awards | e }}</dd>
+      {% endif %}
+      {% if entry.media_type == "series" and entry.total_seasons %}
+      <dt class="font-semibold opacity-60">Seasons</dt>
+      <dd>{{ entry.total_seasons }}</dd>
+      {% endif %}
+    </dl>
+
+    <!-- Plot -->
+    {% if entry.plot %}
+    <div>
+      <h2 class="text-base font-semibold mb-1">Plot</h2>
+      <p class="text-sm opacity-80 leading-relaxed">{{ entry.plot | e }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Remote paths -->
+    {% if entry.remote_paths %}
+    <div>
+      <h2 class="text-base font-semibold mb-1">Remote Path{{ "s" if entry.remote_paths|length > 1 }}</h2>
+      {% for path in entry.remote_paths %}
+        <code class="block break-all font-mono text-xs bg-base-300 rounded px-2 py-1 mb-1">{{ path | e }}</code>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Local paths -->
+    {% if entry.local_paths %}
+    <div>
+      <h2 class="text-base font-semibold mb-1">Local Path{{ "s" if entry.local_paths|length > 1 }}</h2>
+      {% for path in entry.local_paths %}
+        <code class="block break-all font-mono text-xs bg-base-300 rounded px-2 py-1 mb-1">{{ path | e }}</code>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}

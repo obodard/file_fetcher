@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 
 from file_fetcher.db import get_session
-from file_fetcher.services.catalog import search_catalog
+from file_fetcher.services.catalog import get_by_id, search_catalog
 
 router = APIRouter()
 
@@ -52,5 +52,29 @@ async def catalog_grid(
             "current_availability": availability or "",
             "current_ai": ai,
             "title": "file_fetcher — Catalog",
+        },
+    )
+
+
+@router.get("/title/{catalog_id}", response_class=HTMLResponse)
+async def title_detail(request: Request, catalog_id: int) -> HTMLResponse:
+    """Render the full detail page for a single catalog entry.
+
+    Returns 404 (rendered template) if the entry does not exist.
+    """
+    templates = request.app.state.templates
+
+    with get_session() as session:
+        entry = get_by_id(session, catalog_id)
+
+    if entry is None:
+        raise HTTPException(status_code=404)
+
+    return templates.TemplateResponse(
+        request,
+        "catalog/title_detail.html",
+        {
+            "entry": entry,
+            "title": f"{entry.title} — file_fetcher",
         },
     )

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block title %}Not Found — file_fetcher{% endblock %}
+
+{% block content %}
+<div class="flex justify-center items-center min-h-[50vh]">
+  <div class="card bg-base-200 shadow-xl max-w-md w-full">
+    <div class="card-body items-center text-center gap-4">
+      <div class="text-6xl font-bold opacity-20">404</div>
+      <h1 class="card-title text-xl">Title not found</h1>
+      <p class="text-sm opacity-60">
+        The catalog entry you're looking for doesn't exist or may have been removed.
+      </p>
+      <div class="card-actions">
+        <a href="/" class="btn btn-primary">← Back to catalogue</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

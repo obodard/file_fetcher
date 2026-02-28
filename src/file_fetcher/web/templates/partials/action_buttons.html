@@ -1,0 +1,42 @@
+{#
+  Action buttons partial — rendered server-side based on current entry state.
+  Variables expected:
+    - entry : TitleDetail or CatalogResult (needs .id, .availability)
+  This partial is also the HTMX swap target (id="action-buttons").
+#}
+{%- set is_local = entry.availability in ("in_collection", "both") -%}
+{%- set is_queued = entry.availability == "remote_only_downloading" -%}
+
+{% if is_local %}
+  <span class="badge badge-success badge-lg gap-1">
+    ✓ Already downloaded
+  </span>
+{% else %}
+  <div class="flex flex-wrap gap-2" id="action-buttons">
+    {% if not is_queued %}
+    <button
+      class="btn btn-primary btn-sm"
+      hx-post="/api/queue/add"
+      hx-vals='{"catalog_id": {{ entry.id }}}'
+      hx-target="#action-buttons"
+      hx-swap="outerHTML"
+    >
+      + Add to Queue
+    </button>
+    {% endif %}
+
+    <button
+      class="btn btn-secondary btn-sm"
+      hx-post="/api/queue/download-now"
+      hx-vals='{"catalog_id": {{ entry.id }}}'
+      hx-target="#action-buttons"
+      hx-swap="outerHTML"
+    >
+      ⬇ Download Now
+    </button>
+
+    {% if is_queued %}
+    <span class="badge badge-info badge-lg">In Queue</span>
+    {% endif %}
+  </div>
+{% endif %}

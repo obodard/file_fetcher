@@ -5,12 +5,14 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, Response
 
 from file_fetcher.db import get_session
 from file_fetcher.models.omdb_data import OmdbData
-from file_fetcher.services.catalog import search_catalog
+from file_fetcher.services.catalog import get_by_id, search_catalog
+from file_fetcher.services.queue_service import AlreadyQueuedError, enqueue_catalog_entry
+from file_fetcher.web.utils import make_toast
 
 log = logging.getLogger(__name__)
 
@@ -169,3 +171,92 @@ async def grid_fragment(
         },
     )
 
+
+# ── Story 8.2 — queue action endpoints ────────────────────────────────────────
+
+def _action_buttons_response(
+    request: Request,
+    catalog_id: int,
+    *,
+    toast_message: str,
+    toast_type: str,
+) -> HTMLResponse:
+    """Re-fetch entry state, render action_buttons partial + toast OOB."""
+    templates = request.app.state.templates
+
+    with get_session() as session:
+        entry = get_by_id(session, catalog_id)
+
+    if entry is None:
+        return HTMLResponse(
+            content=make_toast("Entry not found.", "error"),
+            status_code=404,
+        )
+
+    partial_html = templates.get_template("partials/action_buttons.html").render(
+        {"entry": entry, "request": request}
+    )
+    return HTMLResponse(content=partial_html + make_toast(toast_message, toast_type))
+
+
+@router.post("/queue/add", response_class=HTMLResponse)
+async def queue_add(
+    request: Request,
+    catalog_id: int = Form(...),
+) -> HTMLResponse:
+    """Add a catalog entry to the download queue via HTMX form post.
+
+    Returns an updated action-buttons partial with a toast OOB fragment.
+    Returns 409 with error toast if the entry is already queued.
+    """
+    try:
+        with get_session() as session:
+            enqueue_catalog_entry(session, catalog_id)
+    except AlreadyQueuedError:
+        return HTMLResponse(
+            content=make_toast("Already in queue.", "error"),
+            status_code=409,
+        )
+    except ValueError as exc:
+        return HTMLResponse(
+            content=make_toast(str(exc), "error"),
+            status_code=422,
+        )
+
+    return _action_buttons_response(
+        request,
+        catalog_id,
+        toast_message="Added to queue!",
+        toast_type="success",
+    )
+
+
+@router.post("/queue/download-now", response_class=HTMLResponse)
+async def queue_download_now(
+    request: Request,
+    catalog_id: int = Form(...),
+) -> HTMLResponse:
+    """Add a catalog entry to the queue with maximum priority (download now).
+
+    Same response contract as ``/api/queue/add``.
+    """
+    try:
+        with get_session() as session:
+            enqueue_catalog_entry(session, catalog_id, priority=999)
+    except AlreadyQueuedError:
+        return HTMLResponse(
+            content=make_toast("Already in queue.", "error"),
+            status_code=409,
+        )
+    except ValueError as exc:
+        return HTMLResponse(
+            content=make_toast(str(exc), "error"),
+            status_code=422,
+        )
+
+    return _action_buttons_response(
+        request,
+        catalog_id,
+        toast_message="Download started!",
+        toast_type="success",
+    )

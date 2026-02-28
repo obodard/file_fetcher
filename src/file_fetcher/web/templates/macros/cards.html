@@ -4,24 +4,28 @@
 {%- set show_add_btn = not is_local and not is_queued -%}
 <div class="card card-compact bg-base-200 shadow hover:shadow-lg transition-shadow group relative cursor-pointer">
 
-  {# Poster image — 2:3 aspect ratio #}
-  <figure class="overflow-hidden rounded-t-2xl">
-    <img
-      src="/api/posters/{{ entry.id }}"
-      alt="{{ entry.title | e }} poster"
-      loading="lazy"
-      class="aspect-[2/3] w-full object-cover"
-    />
-  </figure>
+  {# Poster image — 2:3 aspect ratio — click navigates to detail page #}
+  <a href="/title/{{ entry.id }}">
+    <figure class="overflow-hidden rounded-t-2xl">
+      <img
+        src="/api/posters/{{ entry.id }}"
+        alt="{{ entry.title | e }} poster"
+        loading="lazy"
+        class="aspect-[2/3] w-full object-cover"
+      />
+    </figure>
+  </a>
 
   {# Title overlay #}
   <div class="card-body p-2">
-    <h2 class="card-title text-sm line-clamp-2">
-      {{ entry.title | e }}
-      {% if entry.year %}
-        <span class="text-xs font-normal opacity-60">({{ entry.year }})</span>
-      {% endif %}
-    </h2>
+    <a href="/title/{{ entry.id }}" class="hover:underline">
+      <h2 class="card-title text-sm line-clamp-2">
+        {{ entry.title | e }}
+        {% if entry.year %}
+          <span class="text-xs font-normal opacity-60">({{ entry.year }})</span>
+        {% endif %}
+      </h2>
+    </a>
 
     {# Availability badge #}
     <div class="mt-1">

@@ -23,6 +23,18 @@ function loadMoreManual(btn) {
   });
 }
 
+// ── Toast auto-dismiss via MutationObserver ────────────────────────────────────
+function scheduleToastDismiss(node) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return;
+  if (node.getAttribute("role") !== "alert") return;
+  const delay = node.dataset.toastError ? 5000 : 3000;
+  setTimeout(function () {
+    node.style.transition = "opacity 0.4s";
+    node.style.opacity = "0";
+    setTimeout(function () { node.remove(); }, 400);
+  }, delay);
+}
+
 (function () {
   "use strict";
 
@@ -55,14 +67,44 @@ function loadMoreManual(btn) {
       });
     }
 
-    // ── Toast auto-dismiss ─────────────────────────────────────────────────────
-    document.querySelectorAll("[data-toast]").forEach(function (el) {
-      const delay = el.dataset.toastError ? 5000 : 3000;
-      setTimeout(function () {
-        el.style.transition = "opacity 0.4s";
-        el.style.opacity = "0";
-        setTimeout(function () { el.remove(); }, 400);
-      }, delay);
+    // ── Toast auto-dismiss (server-rendered toasts from page load) ─────────────
+    document.querySelectorAll("[data-toast], [data-toast-error]").forEach(function (el) {
+      scheduleToastDismiss(el);
+    });
+
+    // ── MutationObserver: auto-dismiss HTMX-injected toasts ───────────────────
+    const toastContainer = document.getElementById("toast-container");
+    if (toastContainer) {
+      new MutationObserver(function (mutations) {
+        mutations.forEach(function (m) {
+          m.addedNodes.forEach(function (node) {
+            // Direct alert added (e.g. make_toast OOB inner div)
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (node.getAttribute("role") === "alert") {
+                scheduleToastDismiss(node);
+              } else {
+                // Wrapper div containing the alert (hx-swap-oob container)
+                node.querySelectorAll && node.querySelectorAll("[role=alert]").forEach(scheduleToastDismiss);
+              }
+            }
+          });
+        });
+      }).observe(toastContainer, { childList: true, subtree: true });
+    }
+
+    // ── HTMX responseError fallback — generic error toast ─────────────────────
+    document.body.addEventListener("htmx:responseError", function (e) {
+      if (!toastContainer) return;
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML =
+        '<div role="alert" class="alert alert-error shadow-lg flex items-center gap-2 pr-2" data-toast-error="true">' +
+        '<span class="flex-1 text-sm">Request failed. Please try again.</span>' +
+        '<button aria-label="Dismiss" class="btn btn-ghost btn-xs" ' +
+        "onclick=\"this.closest('[role=alert]').remove()\">✕</button>" +
+        "</div>";
+      const alert = wrapper.firstChild;
+      toastContainer.appendChild(alert);
+      scheduleToastDismiss(alert);
     });
 
     // ── '/' shortcut → focus search ────────────────────────────────────────────
