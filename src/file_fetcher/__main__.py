@@ -194,6 +194,12 @@ def main() -> None:
         queue_group(sys.argv[2:], standalone_mode=True)
         return
 
+    # Delegate `settings` sub-command to the Click group
+    if len(sys.argv) >= 2 and sys.argv[1] == "settings":
+        from file_fetcher.cli.settings_cmd import settings as settings_group
+        settings_group(sys.argv[2:], standalone_mode=True)
+        return
+
     # Delegate `search` sub-command to the Click command (Story 5.3)
     if len(sys.argv) >= 2 and sys.argv[1] == "search":
         from file_fetcher.cli.search import search as search_cmd

@@ -21,7 +21,7 @@ services:
     volumes:
       - ./mariadb_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=$$MYSQL_ROOT_PASSWORD"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -35,7 +35,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["python", "-m", "file_fetcher"]
+    command: ["sh", "-c", "alembic upgrade head && python -m file_fetcher.app_runner"]
     volumes:
       - ./config.yaml:/app/config.yaml:ro
       - ${DOWNLOAD_DIR:-/tmp/downloads}:/data/downloads
@@ -46,7 +46,8 @@ services:
     restart: unless-stopped
     env_file: .env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     command: ["python", "-m", "file_fetcher.watcher_runner"]
     volumes:
       - ${LOCAL_FILMS_PATH:-/tmp/films}:/data/films:ro

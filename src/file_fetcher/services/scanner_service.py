@@ -124,3 +124,63 @@ def _safe_parse(filename: str) -> tuple[str, int | None]:
     except Exception as exc:  # pragma: no cover
         log.warning(f"Failed to parse filename {filename!r}: {exc}")
         return filename, None
+
+
+def run_full_scan(session: Session) -> None:
+    """High-level scan that reads SFTP paths from the environment and reconciles the DB.
+
+    Reads ``SFTP_HOST``, ``SFTP_PORT``, ``SFTP_USER``, ``SFTP_PASSWORD``,
+    ``SFTP_FILMS_PATH``, and ``SFTP_SERIES_PATH`` from the process environment
+    (already loaded by :func:`file_fetcher.bootstrap.initialize_app`).
+
+    Silently skips each path when the env var is empty or the SFTP connection
+    fails, logging a warning instead of raising.
+
+    Args:
+        session: Active SQLAlchemy session (caller commits).
+    """
+    import os
+
+    import paramiko
+
+    from file_fetcher.scanner import scan_remote_path
+
+    sftp_host = os.environ.get("SFTP_HOST", "")
+    sftp_port = int(os.environ.get("SFTP_PORT", "22"))
+    sftp_user = os.environ.get("SFTP_USER", "")
+    sftp_password = os.environ.get("SFTP_PASSWORD", "")
+    films_path = os.environ.get("SFTP_FILMS_PATH", "")
+    series_path = os.environ.get("SFTP_SERIES_PATH", "")
+
+    if not sftp_host:
+        log.warning("run_full_scan: SFTP_HOST not set — skipping scan.")
+        return
+
+    transport: paramiko.Transport | None = None
+    sftp_client = None
+    try:
+        transport = paramiko.Transport((sftp_host, sftp_port))
+        transport.connect(username=sftp_user, password=sftp_password)
+        sftp_client = paramiko.SFTPClient.from_transport(transport)
+
+        if films_path:
+            try:
+                films_results = scan_remote_path(sftp_client, films_path)
+                reconcile_remote_scan(session, films_results, MediaType.film)
+            except Exception as exc:
+                log.warning(f"run_full_scan: films scan failed: {exc}")
+
+        if series_path:
+            try:
+                series_results = scan_remote_path(sftp_client, series_path)
+                reconcile_remote_scan(session, series_results, MediaType.series)
+            except Exception as exc:
+                log.warning(f"run_full_scan: series scan failed: {exc}")
+
+    except Exception as exc:
+        log.error(f"run_full_scan: SFTP connection error: {exc}")
+    finally:
+        if sftp_client:
+            sftp_client.close()
+        if transport:
+            transport.close()

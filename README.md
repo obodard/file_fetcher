@@ -272,6 +272,64 @@ file_fetcher/
 
 ---
 
+## Docker Setup (Recommended for Production)
+
+The full stack — MariaDB, the scheduler/app runner, and the filesystem watcher — can be run with a single command via Docker Compose.
+
+### One-time Setup
+
+1. **Copy and fill `.env`**
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env` and set at minimum:
+
+   ```env
+   MYSQL_ROOT_PASSWORD=changeme
+   MYSQL_USER=file_fetcher
+   MYSQL_PASSWORD=changeme
+   DATABASE_URL=mysql+pymysql://file_fetcher:changeme@db/file_fetcher
+   SFTP_HOST=your.server.com
+   SFTP_USER=your_username
+   SFTP_PASSWORD=your_password
+   DOWNLOAD_DIR=/path/to/downloads
+   LOCAL_FILMS_PATH=/path/to/films
+   LOCAL_SERIES_PATH=/path/to/series
+   ```
+
+2. **Build and start the stack**
+
+   ```bash
+   docker-compose up -d --build
+   ```
+
+   Docker Compose will:
+   - Start **MariaDB** and wait for its healthcheck to pass.
+   - Run `alembic upgrade head` to apply all DB migrations.
+   - Start the **APScheduler-backed app runner** (SFTP scan + OMDB enrichment on cron schedules).
+   - Start the **filesystem watcher** for local media directories.
+
+3. **Check status**
+
+   ```bash
+   docker-compose ps
+   docker-compose logs -f app
+   ```
+
+### Restart Policy
+
+All three services use `restart: unless-stopped`:
+- After a crash or host reboot, Docker automatically restarts the containers.
+- If you manually stop a service with `docker stop` or `docker-compose stop`, it stays stopped until you start it again.
+
+### Known Limitation — Watcher & Container Downtime
+
+The `watcher` service uses filesystem events to detect new local media files. **Files added to `LOCAL_FILMS_PATH` or `LOCAL_SERIES_PATH` while the watcher container is stopped (e.g., during a host reboot) will NOT be automatically indexed.** Resume normal operation and trigger a manual scan via `file-fetcher scan` to catch any missed files.
+
+---
+
 ## Local Filesystem Watcher
 
 The `watcher` Docker service monitors your local films and series directories for new media files and registers them in the catalog automatically.

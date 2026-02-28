@@ -7,6 +7,7 @@ from file_fetcher.models.local_file import LocalFile  # noqa: F401
 from file_fetcher.models.movie import Movie  # noqa: F401
 from file_fetcher.models.omdb_data import OmdbData  # noqa: F401
 from file_fetcher.models.remote_file import RemoteFile  # noqa: F401
+from file_fetcher.models.setting import Setting  # noqa: F401
 from file_fetcher.models.show import Episode, Season, Show  # noqa: F401
 
 __all__ = [
@@ -19,6 +20,7 @@ __all__ = [
     "OmdbData",
     "OmdbStatus",
     "RemoteFile",
+    "Setting",
     "Show",
     "Season",
     "Episode",
