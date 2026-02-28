@@ -10,7 +10,7 @@ from sqlalchemy import ForeignKey, Index, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from file_fetcher.models.base import Base
-from file_fetcher.models.enums import MediaType
+from file_fetcher.models.enums import MediaType, OmdbStatus
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +33,10 @@ class Show(Base):
     )
     title_override: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     year_override: Mapped[Optional[int]] = mapped_column(nullable=True)
+    omdb_status: Mapped[OmdbStatus] = mapped_column(
+        default=OmdbStatus.PENDING,
+        server_default=OmdbStatus.PENDING.value,
+    )
     created_at: Mapped[datetime] = mapped_column(
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
@@ -43,6 +47,9 @@ class Show(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
+    omdb_data: Mapped[Optional["OmdbData"]] = relationship(  # noqa: F821
+        "OmdbData", foreign_keys="OmdbData.show_id", back_populates="show", uselist=False
+    )
     seasons: Mapped[list[Season]] = relationship(
         "Season", back_populates="show", cascade="all, delete-orphan"
     )

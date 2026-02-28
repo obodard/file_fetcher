@@ -26,6 +26,7 @@ if config.config_file_name is not None:
 # Import all models so Alembic can detect them for autogenerate
 from file_fetcher.models.base import Base  # noqa: E402
 from file_fetcher.models.movie import Movie  # noqa: E402, F401
+from file_fetcher.models.omdb_data import OmdbData  # noqa: E402, F401
 from file_fetcher.models.remote_file import RemoteFile  # noqa: E402, F401
 from file_fetcher.models.show import Show, Season, Episode  # noqa: E402, F401
 

@@ -147,7 +147,31 @@ def main() -> None:
     # Search subcommand
     search_parser = subparsers.add_parser("search", help="Intelligent media search")
     search_parser.add_argument("query", help="Natural language query (e.g. 'recent 2026 movies')")
-    
+
+    # Scan subcommand
+    subparsers.add_parser("scan", help="Scan SFTP server and reconcile catalog")
+
+    # Enrich subcommand
+    enrich_parser = subparsers.add_parser("enrich", help="Enrich catalog entries with OMDB metadata")
+    enrich_id_group = enrich_parser.add_mutually_exclusive_group()
+    enrich_id_group.add_argument("--id", dest="movie_id", type=int, metavar="MOVIE_ID",
+                                  help="Enrich a single movie (force re-fetch)")
+    enrich_id_group.add_argument("--show", dest="show_id", type=int, metavar="SHOW_ID",
+                                  help="Enrich a single show (force re-fetch)")
+
+    # Override subcommand
+    override_parser = subparsers.add_parser("override", help="Set title/year override for re-enrichment")
+    override_id_group = override_parser.add_mutually_exclusive_group(required=True)
+    override_id_group.add_argument("movie_id", nargs="?", type=int, metavar="MOVIE_ID",
+                                    help="Movie PK to override")
+    override_id_group.add_argument("--show", dest="show_id", type=int, metavar="SHOW_ID",
+                                    help="Show PK to override")
+    override_parser.add_argument("--title", type=str, help="New title override")
+    override_parser.add_argument("--year", type=int, help="New year override")
+
+    # Not-found subcommand
+    subparsers.add_parser("not-found", help="Report all catalog entries OMDB could not match")
+
     # If no arguments provided, default to download for backward compatibility
     if len(sys.argv) == 1:
         handle_download()
@@ -159,6 +183,23 @@ def main() -> None:
         handle_download()
     elif args.command == "search":
         handle_search(args.query)
+    elif args.command == "scan":
+        from file_fetcher.cli.scan import run_scan
+        run_scan()
+    elif args.command == "enrich":
+        from file_fetcher.cli.enrich import run_enrich
+        run_enrich(movie_id=getattr(args, "movie_id", None), show_id=getattr(args, "show_id", None))
+    elif args.command == "override":
+        from file_fetcher.cli.override import run_override
+        run_override(
+            movie_id=getattr(args, "movie_id", None),
+            show_id=getattr(args, "show_id", None),
+            title=getattr(args, "title", None),
+            year=getattr(args, "year", None),
+        )
+    elif args.command == "not-found":
+        from file_fetcher.cli.enrich import run_not_found
+        run_not_found()
 
 
 if __name__ == "__main__":
