@@ -4,12 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import TYPE_CHECKING
-
-from google.adk.agents import Agent
-from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
-from google.genai import types
+from typing import TYPE_CHECKING, Any
 
 from file_fetcher import logger
 from file_fetcher.agent.tools import make_search_tool, make_ratings_tool, sanitize_query
@@ -66,8 +61,10 @@ def create_agent(
     scanner: "SFTPScanner",
     omdb_api_key: str,
     model: str = "gemini-2.5-flash",
-) -> Agent:
+) -> Any:
     """Build the FileFetcher ADK agent with tools bound to *scanner*."""
+    from google.adk.agents import Agent  # lazy — avoids loading google.genai at import time
+
     search_tool = make_search_tool(scanner)
     ratings_tool = make_ratings_tool(omdb_api_key)
 
@@ -81,8 +78,12 @@ def create_agent(
     return agent
 
 
-async def _run_agent_async(agent: Agent, query: str) -> str:
+async def _run_agent_async(agent: Any, query: str) -> str:
     """Send *query* to the agent and collect the final text response."""
+    from google.adk.runners import Runner  # lazy
+    from google.adk.sessions import InMemorySessionService  # lazy
+    from google.genai import types  # lazy
+
     session_service = InMemorySessionService()
     runner = Runner(
         agent=agent,
@@ -119,7 +120,7 @@ async def _run_agent_async(agent: Agent, query: str) -> str:
     return final_text
 
 
-def run_agent(agent: Agent, query: str) -> list[dict]:
+def run_agent(agent: Any, query: str) -> list[dict]:
     """Run the agent synchronously and return the selected items.
 
     Returns a list of dicts, each with keys ``index``, ``title``, ``reason``.

@@ -20,6 +20,36 @@ class MediaEntry:
     size_bytes: int
     media_type: str
 
+
+def scan_remote_path(
+    sftp: paramiko.SFTPClient,
+    base_dir: str,
+) -> list[tuple[str, str, str]]:
+    """Scan a single remote directory and return raw file tuples.
+
+    Returns:
+        List of ``(remote_path, filename, source_directory)`` tuples.
+        No filtering or DB interaction — pure data retrieval.
+    """
+    results: list[tuple[str, str, str]] = []
+    try:
+        entries = sftp.listdir_attr(base_dir)
+    except FileNotFoundError:
+        logger.warning(f"Remote directory not found: {base_dir}")
+        return results
+    except Exception as exc:
+        logger.warning(f"Failed to list remote directory {base_dir!r}: {exc}")
+        return results
+
+    for entry in entries:
+        filename = entry.filename
+        remote_path = f"{base_dir}/{filename}"
+        results.append((remote_path, filename, base_dir))
+
+    logger.debug(f"scan_remote_path({base_dir!r}): {len(results)} entries")
+    return results
+
+
 class SFTPScanner:
     """Scans the designated media folders over SFTP."""
     

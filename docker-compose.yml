@@ -1,0 +1,54 @@
+version: "3.9"
+
+volumes:
+  mariadb_data:
+
+services:
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: file_fetcher
+      MYSQL_USER: ${MYSQL_USER:-file_fetcher}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-file_fetcher}
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  app:
+    image: file_fetcher:latest
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["python", "-m", "file_fetcher"]
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ${DOWNLOAD_DIR:-/tmp/downloads}:/data/downloads
+
+  watcher:
+    image: file_fetcher:latest
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["python", "-c", "import time; time.sleep(86400)"]
+    volumes:
+      - ${LOCAL_FILMS_PATH:-/tmp/films}:/data/films:ro
+      - ${LOCAL_SERIES_PATH:-/tmp/series}:/data/series:ro
